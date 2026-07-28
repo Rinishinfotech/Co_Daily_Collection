@@ -52,7 +52,3 @@ def auth_dependency(db):
         return user
 
     return current_user
-
-
-def require_admin(user: dict = Depends(lambda: None)):
-    return user
