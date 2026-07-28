@@ -1,0 +1,172 @@
+{
+  "theme_strategy": {
+    "default_theme": "light",
+    "theme_toggle": false,
+    "archetype": "SWISS & HIGH-CONTRAST + ORGANIC & EARTHY",
+    "vibe": "Trustworthy, Financial-Tech, Precise, Efficient",
+    "description": "A light-themed, high-contrast UI tailored for financial trust and clarity. Employee mobile interface is tactile with large touch targets and progressive disclosure. Admin desktop interface relies on dense, table-first structures and F-pattern scanning."
+  },
+  "typography": {
+    "font_strategy": "The 'Soft Utility' Pair",
+    "headings": {
+      "family": "Manrope, sans-serif",
+      "weight": "font-bold to font-extrabold",
+      "tracking": "tracking-tight",
+      "color": "text-slate-900"
+    },
+    "body": {
+      "family": "Inter, sans-serif",
+      "weight": "font-normal to font-medium",
+      "tracking": "tracking-normal",
+      "color": "text-slate-700"
+    },
+    "numbers": {
+      "family": "Manrope, sans-serif",
+      "weight": "font-semibold",
+      "variant": "tabular-nums",
+      "description": "Crucial for all currency amounts and KPI metrics."
+    },
+    "rules": [
+      "Headings never use Inter.",
+      "Max heading size text-5xl on desktop, text-3xl on mobile.",
+      "Labels use uppercase, tiny size, wide tracking (tracking-[0.2em])."
+    ]
+  },
+  "colors": {
+    "background": {
+      "app": "#F8FAFC",
+      "card": "#FFFFFF",
+      "sidebar": "#0F172A"
+    },
+    "text": {
+      "primary": "#0F172A",
+      "secondary": "#475569",
+      "inverse": "#FFFFFF",
+      "emerald": "#059669"
+    },
+    "brand": {
+      "primary": "#0F172A",
+      "primary_hover": "#1E293B",
+      "secondary": "#059669",
+      "secondary_hover": "#047857"
+    },
+    "status": {
+      "success": { "bg": "#D1FAE5", "text": "#065F46" },
+      "warning": { "bg": "#FEF3C7", "text": "#92400E" },
+      "danger": { "bg": "#FEE2E2", "text": "#991B1B" },
+      "info": { "bg": "#DBEAFE", "text": "#1E40AF" }
+    },
+    "borders": {
+      "default": "#E2E8F0",
+      "focus": "#059669"
+    },
+    "rules": [
+      "No gradients for backgrounds. Keep surfaces matte and flat.",
+      "Status colors must meet 4.5:1 contrast ratio.",
+      "Emerald green used for primary action buttons (Collect, Share WhatsApp) to imply growth and success.",
+      "Dark Navy used for primary branding and Admin sidebar."
+    ]
+  },
+  "layouts": {
+    "employee_mobile_portal": {
+      "pattern": "Task-First Progressive Mobile App",
+      "structure": "Sticky Header with Role Toggle -> Scrollable Content -> Floating Action Button (Optional) or Sticky Bottom CTA.",
+      "spacing": "Generous vertical spacing (gap-6) between cards. Full-width inputs and buttons.",
+      "touch_targets": "All interactive elements must be min h-12 (48px) for field agents using mobile."
+    },
+    "admin_desktop_portal": {
+      "pattern": "Sidebar + High Density Dashboard",
+      "structure": "Left Dark Sidebar (w-64) -> Top Header (Role Toggle & Global Search) -> Main Content Area.",
+      "grid": "Bento Grid Protocol Mode B (High Density Grid). gap-4 or gap-6. Metric Cards span 1 col, Charts span 2-3 cols, Tables span full width.",
+      "cards": "Flat background, 1px border-slate-200, no shadow. Slight shadow-sm on hover."
+    }
+  },
+  "components": {
+    "cards": {
+      "style": "Neumorphic Flat. bg-white border border-slate-200 rounded-xl.",
+      "padding": "p-5 or p-6"
+    },
+    "buttons": {
+      "primary": "bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg h-12 (mobile) or h-10 (desktop) font-medium transition-colors",
+      "secondary": "bg-slate-900 hover:bg-slate-800 text-white rounded-lg",
+      "outline": "border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg",
+      "whatsapp": "bg-[#25D366] hover:bg-[#1DA851] text-white flex items-center justify-center gap-2"
+    },
+    "inputs": {
+      "style": "bg-white border border-slate-300 rounded-lg h-12 (mobile) px-4 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all",
+      "labels": "text-sm font-medium text-slate-700 mb-1.5 block"
+    },
+    "tables": {
+      "style": "w-full text-sm text-left. border-collapse.",
+      "header": "bg-slate-50 text-slate-500 font-semibold uppercase tracking-wider py-3 px-4 border-y border-slate-200",
+      "row": "border-b border-slate-100 hover:bg-slate-50 transition-colors",
+      "cell": "py-3 px-4 text-slate-700 whitespace-nowrap"
+    },
+    "badges": {
+      "style": "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+    }
+  },
+  "motion": {
+    "page_transitions": "Fade in with slight upward slide (translate-y-2 -> 0) using framer-motion.",
+    "hover_states": "Buttons and cards scale-up slightly (scale-[1.01]) or elevate shadow. Fast transition (duration-200).",
+    "feedback": "Toast notifications slide in from bottom (mobile) or top-right (desktop) for successful collections/expenses."
+  },
+  "visual_enhancers": {
+    "icons": "lucide-react for all standard UI icons. Stroke width 2 or 1.5.",
+    "charts": "recharts. Use AreaCharts for trends with emerald gradient fill (opacity 0.2 to 0). BarCharts for daily collection comparisons.",
+    "receipt": "Render receipt as a centered, visually distinct 'ticket' card with dashed top border, light gray bg, and monospace font for transaction ID."
+  },
+  "accessibility": {
+    "contrast": "Ensure all text against colored backgrounds is white or strictly contrasting.",
+    "focus": "All form inputs and buttons must have visible focus rings.",
+    "aria": "Use semantic HTML, roles, and aria-labels for icon-only buttons."
+  },
+  "image_urls": {
+    "employees": [
+      {
+        "url": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzR8MHwxfHNlYXJjaHwzfHxwcm9mZXNzaW9uYWwlMjBhdmF0YXIlMjBoZWFkc2hvdHxlbnwwfHx8fDE3ODUxMzEyNTF8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Employee 1 Avatar"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1580489944761-15a19d654956?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzR8MHwxfHNlYXJjaHw0fHxwcm9mZXNzaW9uYWwlMjBhdmF0YXIlMjBoZWFkc2hvdHxlbnwwfHx8fDE3ODUxMzEyNTF8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Employee 2 Avatar"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzR8MHwxfHNlYXJjaHwxfHxwcm9mZXNzaW9uYWwlMjBhdmF0YXIlMjBoZWFkc2hvdHxlbnwwfHx8fDE3ODUxMzEyNTF8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Employee 3 Avatar"
+      }
+    ],
+    "vendors": [
+      {
+        "url": "https://images.unsplash.com/photo-1595245761073-0eb3ca3f179c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MTN8MHwxfHNlYXJjaHwyfHxzbWFsbCUyMHJldGFpbCUyMHNob3AlMjBzdG9yZWZyb250fGVufDB8fHx8MTc4NTIyOTgzMHww&ixlib=rb-4.1.0&q=85",
+        "description": "Vendor Store 1"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1571974448718-ac26a9af7d8b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MTN8MHwxfHNlYXJjaHwxfHxzbWFsbCUyMHJldGFpbCUyMHNob3AlMjBzdG9yZWZyb250fGVufDB8fHx8MTc4NTIyOTgzMHww&ixlib=rb-4.1.0&q=85",
+        "description": "Vendor Store 2"
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Install lucide-react, recharts, framer-motion, date-fns, sonner.",
+    "Create a responsive shell: If user is in Employee View, use a mobile-app layout (max-w-md mx-auto on desktop, full width on mobile) with bottom padding for scrolling.",
+    "If user is in Admin View, use a full desktop layout with a persistent dark sidebar.",
+    "Implement a clear header toggle: 'Admin View' | 'Employee View'.",
+    "For the digital receipt generation, build a visually striking component that looks like a printed thermal receipt or premium ticket. Use a monospace font for receipt numbers.",
+    "The 'Share via WhatsApp' button must construct a wa.me URL with properly URI-encoded text containing the receipt details.",
+    "Pre-populate the system state with mock arrays for vendors, employees, transactions, and expenses. Ensure actions (like adding a collection) update this mock state so charts and tables react dynamically.",
+    "Do NOT use 'Inter' for headings. Use 'Manrope' for headings/numbers and 'Inter' for body.",
+    "Ensure all interactive elements have data-testid attributes.",
+    "Do not use transparent backgrounds for dropdowns or modals; always use solid white or glassmorphism (bg-white/90 backdrop-blur-xl)."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "You tend to converge toward generic outputs. Make creative, distinctive frontends that surprise and delight.",
+    "Create depth through layered design elements with z-index hierarchy and subtle borders.",
+    "You MUST NOT apply universal transition (e.g., transition: all). Add transitions for specific properties.",
+    "You MUST NOT center align the app container. Text alignment should be left by default.",
+    "Always use modern button styles with interaction animations.",
+    "NEVER use emoji characters for icons. Use lucide-react.",
+    "Every interaction needs micro-animations - hover states, transitions.",
+    "Prioritize using Shadcn UI components and customize them to fit the branding."
+  ]
+}
