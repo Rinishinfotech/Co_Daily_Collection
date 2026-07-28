@@ -37,7 +37,7 @@ def admin():
 @pytest.fixture(scope="session")
 def new_employee(admin):
     """Create a fresh employee we can freely mutate/change password on."""
-    phone = f"+91 900000{int(time.time()) % 10000:04d}"
+    phone = f"+91 9{uuid.uuid4().int % 1000000000:09d}"
     temp_password = "TempPass@123"
     r = admin["session"].post(
         f"{API}/employees",
@@ -288,3 +288,143 @@ def test_no_mongo_id_leak(admin):
         assert r.status_code == 200
         for item in r.json():
             assert "_id" not in item
+
+
+
+# -- profile photo uploads -------------------------------------------------
+# 1x1 PNG (real PNG, not just header bytes)
+_PNG_1x1 = bytes.fromhex(
+    "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489"
+    "0000000d49444154789c62f8cf0000000300010001f5da8b8b0000000049454e44ae426082"
+)
+# 1x1 JPEG
+_JPG_1x1 = bytes.fromhex(
+    "ffd8ffe000104a46494600010100000100010000ffdb004300080606070605080707"
+    "070909080a0c140d0c0b0b0c1912130f141d1a1f1e1d1a1c1c20242e2720222c231c1c"
+    "2837292c30313434341f27393d38323c2e333432ffdb0043010909090c0b0c180d0d18"
+    "32211c2132323232323232323232323232323232323232323232323232323232323232"
+    "3232323232323232323232323232323232323232ffc00011080001000103012200021101"
+    "031101ffc4001f0000010501010101010100000000000000000102030405060708090a"
+    "0bffc400b5100002010303020403050504040000017d01020300041105122131410613"
+    "516107227114328191a1082342b1c11552d1f02433627282090a161718191a25262728"
+    "292a3435363738393a434445464748494a535455565758595a636465666768696a7374"
+    "75767778797a838485868788898a92939495969798999aa2a3a4a5a6a7a8a9aab2b3b4"
+    "b5b6b7b8b9bac2c3c4c5c6c7c8c9cad2d3d4d5d6d7d8d9dae1e2e3e4e5e6e7e8e9eaf1"
+    "f2f3f4f5f6f7f8f9faffc4001f0100030101010101010101010000000000000102030405"
+    "060708090a0bffc400b511000201020404030407050404000102770001020311040521"
+    "3106124151076171132232810814429115a1b1c109233352f0156272d10a162434e125"
+    "f11718191a262728292a35363738393a434445464748494a535455565758595a636465"
+    "666768696a737475767778797a82838485868788898a92939495969798999aa2a3a4a5"
+    "a6a7a8a9aab2b3b4b5b6b7b8b9bac2c3c4c5c6c7c8c9cad2d3d4d5d6d7d8d9dae2e3e4"
+    "e5e6e7e8e9eaf2f3f4f5f6f7f8f9faffda000c03010002110311003f00fbd0028affd9"
+)
+
+
+class TestProfilePhoto:
+    """Employee profile photo upload / access-control tests."""
+
+    def _upload(self, session, content, filename, content_type):
+        # Do NOT send Content-Type: application/json header for multipart
+        headers = {k: v for k, v in session.headers.items() if k.lower() != "content-type"}
+        return requests.post(
+            f"{API}/profile/photo",
+            files={"file": (filename, content, content_type)},
+            headers=headers,
+        )
+
+    def test_admin_cannot_upload_photo(self, admin):
+        r = self._upload(admin["session"], _PNG_1x1, "a.png", "image/png")
+        assert r.status_code == 403, r.text
+
+    def test_employee_upload_png_success(self, employee):
+        r = self._upload(employee["session"], _PNG_1x1, "me.png", "image/png")
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert "photo_file_id" in body
+        assert isinstance(body["photo_file_id"], str) and len(body["photo_file_id"]) > 10
+        # storage path / access keys must not leak
+        for banned in ("storage_path", "storage_key", "path", "url"):
+            assert banned not in body
+        # profile now reflects the photo id
+        prof = employee["session"].get(f"{API}/profile").json()
+        assert prof["employee"]["photo_file_id"] == body["photo_file_id"]
+        # Persist for later tests
+        employee["meta"]["photo_file_id"] = body["photo_file_id"]
+
+    def test_employee_upload_jpeg_success(self, employee):
+        r = self._upload(employee["session"], _JPG_1x1, "me.jpg", "image/jpeg")
+        assert r.status_code == 200, r.text
+        new_id = r.json()["photo_file_id"]
+        # Old file should now be soft-deleted
+        old_id = employee["meta"].get("photo_file_id")
+        if old_id and old_id != new_id:
+            # Old id should no longer be retrievable (soft-deleted)
+            r_old = employee["session"].get(f"{API}/files/{old_id}")
+            assert r_old.status_code == 404, f"Old photo {old_id} should be soft-deleted, got {r_old.status_code}"
+        employee["meta"]["photo_file_id"] = new_id
+
+    def test_reject_unsupported_type(self, employee):
+        r = self._upload(employee["session"], b"GIF89a\x00\x00\x00\x00", "x.gif", "image/gif")
+        assert r.status_code == 400, r.text
+        assert "JPG" in r.json()["detail"] or "PNG" in r.json()["detail"] or "WebP" in r.json()["detail"]
+
+    def test_reject_text_file(self, employee):
+        r = self._upload(employee["session"], b"hello", "x.txt", "text/plain")
+        assert r.status_code == 400, r.text
+
+    def test_reject_oversized_file(self, employee):
+        big = b"\x89PNG\r\n\x1a\n" + b"0" * (5 * 1024 * 1024 + 100)
+        r = self._upload(employee["session"], big, "big.png", "image/png")
+        assert r.status_code == 400, r.text
+        assert "5 MB" in r.json()["detail"]
+
+    def test_owner_can_view_photo(self, employee):
+        pid = employee["meta"]["photo_file_id"]
+        r = employee["session"].get(f"{API}/files/{pid}")
+        assert r.status_code == 200, r.text
+        assert r.headers["content-type"].startswith("image/")
+        assert len(r.content) > 0
+
+    def test_admin_can_view_employee_photo(self, admin, employee):
+        pid = employee["meta"]["photo_file_id"]
+        r = admin["session"].get(f"{API}/files/{pid}")
+        assert r.status_code == 200, r.text
+        assert r.headers["content-type"].startswith("image/")
+
+    def test_other_employee_cannot_view_photo(self, admin, employee):
+        pid = employee["meta"]["photo_file_id"]
+        # create a second employee
+        phone2 = f"+91 9{uuid.uuid4().int % 1000000000:09d}"
+        r = admin["session"].post(
+            f"{API}/employees",
+            json={"name": "TEST_OtherEmp", "phone": phone2, "territory": "TEST_Z2",
+                  "temporary_password": "TempPass@123"},
+        )
+        assert r.status_code == 200, r.text
+        s2, _ = _login(phone2, "TempPass@123")
+        r_other = s2.get(f"{API}/files/{pid}")
+        assert r_other.status_code == 403, r_other.text
+
+    def test_unauth_cannot_view_photo(self, employee):
+        pid = employee["meta"]["photo_file_id"]
+        r = requests.get(f"{API}/files/{pid}")
+        assert r.status_code == 401
+
+    def test_missing_file_404(self, employee):
+        r = employee["session"].get(f"{API}/files/nonexistent-{uuid.uuid4()}")
+        assert r.status_code == 404
+
+    def test_no_storage_path_leak_in_employees_list(self, admin, employee):
+        r = admin["session"].get(f"{API}/employees")
+        assert r.status_code == 200
+        for emp in r.json():
+            for banned in ("storage_path", "storage_key"):
+                assert banned not in emp, f"leaked {banned} in employees payload"
+
+    def test_no_storage_path_leak_in_profile(self, employee):
+        r = employee["session"].get(f"{API}/profile")
+        assert r.status_code == 200
+        blob = r.text
+        assert "storage_path" not in blob
+        assert "objstore" not in blob
+        assert "X-Storage-Key" not in blob

@@ -1,11 +1,13 @@
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pymongo import ReturnDocument
+from starlette.responses import Response
 
 from auth import hash_password, sanitize_user
 from models import Collection, CollectionCreate, Employee, EmployeeCreate, Expense, ExpenseCreate, Vendor, VendorCreate
+from storage import download_photo, upload_profile_photo
 
 
 def build_router(db, current_user):
@@ -35,6 +37,42 @@ def build_router(db, current_user):
         if user["role"] == "employee":
             employee = await db.employees.find_one({"id": user["employee_id"]}, {"_id": 0})
         return {"account": sanitize_user(user), "employee": employee}
+
+    @router.post("/profile/photo")
+    async def upload_own_photo(file: UploadFile = File(...), user: dict = Depends(current_user)):
+        if user["role"] != "employee":
+            raise HTTPException(status_code=403, detail="Only employee accounts can update profile photos")
+        allowed_types = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+        if file.content_type not in allowed_types:
+            raise HTTPException(status_code=400, detail="Upload a JPG, PNG, or WebP image")
+        contents = await file.read()
+        if not contents or len(contents) > 5 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="Profile photos must be smaller than 5 MB")
+        try:
+            storage_path = upload_profile_photo(user["employee_id"], contents, allowed_types[file.content_type], file.content_type)
+        except Exception as error:
+            raise HTTPException(status_code=502, detail="Photo storage is temporarily unavailable") from error
+        file_id = str(uuid4())
+        old_photo_id = (await db.employees.find_one({"id": user["employee_id"]}, {"_id": 0, "photo_file_id": 1}) or {}).get("photo_file_id")
+        if old_photo_id:
+            await db.files.update_one({"id": old_photo_id}, {"$set": {"is_deleted": True}})
+        file_record = {"id": file_id, "owner_employee_id": user["employee_id"], "storage_path": storage_path, "content_type": file.content_type, "size": len(contents), "is_deleted": False, "created_at": datetime.now(timezone.utc).isoformat()}
+        await db.files.insert_one(file_record)
+        await db.employees.update_one({"id": user["employee_id"]}, {"$set": {"photo_file_id": file_id}})
+        return {"photo_file_id": file_id}
+
+    @router.get("/files/{file_id}")
+    async def view_profile_photo(file_id: str, user: dict = Depends(current_user)):
+        record = await db.files.find_one({"id": file_id, "is_deleted": False}, {"_id": 0})
+        if not record:
+            raise HTTPException(status_code=404, detail="Photo not found")
+        if user["role"] != "admin" and record["owner_employee_id"] != user["employee_id"]:
+            raise HTTPException(status_code=403, detail="You can only view your own profile photo")
+        try:
+            contents, content_type = download_photo(record["storage_path"])
+        except Exception as error:
+            raise HTTPException(status_code=502, detail="Photo storage is temporarily unavailable") from error
+        return Response(content=contents, media_type=content_type)
 
     @router.get("/vendors", response_model=list[Vendor])
     async def list_vendors(search: str = "", user: dict = Depends(current_user)):

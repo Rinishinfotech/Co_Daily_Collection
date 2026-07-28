@@ -5,6 +5,7 @@ import PortalHeader from "@/components/PortalHeader";
 import EmployeePortal from "@/pages/EmployeePortal";
 import AdminPortal from "@/pages/AdminPortal";
 import LoginPage from "@/pages/LoginPage";
+import ProfilePanel from "@/components/ProfilePanel";
 import { api, setAuthToken } from "@/lib/api";
 
 function App() {
@@ -38,7 +39,7 @@ function App() {
     <div className="app-shell">
       <PortalHeader onLogout={logout} onProfile={() => setProfile((value) => ({ ...value, open: !value?.open }))} user={user} />
       {user.role === "employee" ? <EmployeePortal employee={profile?.employee || user} vendors={vendors} refreshKey={refreshKey} onDataChange={refresh} mustChangePassword={user.must_change_password} onPasswordChanged={() => setUser({ ...user, must_change_password: false })} /> : <AdminPortal employees={employees} vendors={vendors} refreshKey={refreshKey} onDataChange={refresh} />}
-      {profile?.open && <section className="profile-popover" data-testid="profile-panel"><button className="icon-button profile-close" data-testid="profile-close-button" onClick={() => setProfile({ ...profile, open: false })}>×</button><p className="eyebrow">MY PROFILE</p><h2 data-testid="profile-name">{user.name}</h2><p data-testid="profile-phone">{user.phone}</p><p data-testid="profile-role">{user.role === "admin" ? "Administrator account" : profile.employee?.territory}</p></section>}
+      {profile?.open && <ProfilePanel onClose={() => setProfile({ ...profile, open: false })} onUploaded={refresh} profile={profile} user={user} />}
       <Toaster position="top-right" richColors />
     </div>
   );

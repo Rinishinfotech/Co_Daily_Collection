@@ -30,6 +30,10 @@ Build a production-ready money collection management app for field agents and ad
 - Administrators can open an employee profile and daily activity report listing collection amounts and vendors.
 - Browser session access now uses the explicit application origin for secure credential handling.
 
+## Feature Added — 2026-07-28
+- Employees can securely upload JPG, PNG, or WebP profile photos up to 5 MB.
+- Photos are private: employees may update/view only their own photo, while administrators can view team photos in employee records.
+
 ## Prioritized Backlog
 ### P0
 - None.

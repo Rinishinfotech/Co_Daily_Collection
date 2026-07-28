@@ -34,6 +34,7 @@ class Employee(BaseModel):
     territory: str
     active: bool = True
     avatar: Optional[str] = None
+    photo_file_id: Optional[str] = None
 
 
 class CollectionCreate(BaseModel):

@@ -1,0 +1,48 @@
+{
+  "summary": "Full backend + frontend E2E for the new employee profile-photo feature (Emergent object storage). Added 13 new pytest cases in TestProfilePhoto covering: employee upload of valid PNG/JPEG (200 + photo_file_id returned, /profile reflects id, no storage_path leak), rejection of unsupported types (GIF/text -> 400), rejection of >5 MB uploads (400 with '5 MB' message), owner GET /files/{id} returns image bytes with correct content-type, admin GET /files/{id} for any employee's photo (200), other-employee attempt (403), unauthenticated GET (401), missing file (404), admin POST /profile/photo (403), replaced-photo soft-delete verified via subsequent 404 on old id, and no storage_path/storage_key leakage in /employees or /profile payloads. Full backend suite now 43 passed, 1 skipped (seed employee flag - expected). Also fixed a flaky phone-collision in the session-scoped `new_employee` fixture (time.time()%10000 collided under xdist parallel workers) - replaced with uuid-based unique phones. Frontend Playwright: as Raj (+91 98765 42100 / RajSecure@2026) opened profile panel via header, uploaded a real 1x1 PNG via <input type='file' data-testid='profile-photo-input'>, saw 'Profile photo updated' toast (success). Logged in as admin (9999999999/Admin@123), employee directory rendered Raj's photo as <img> (naturalWidth=1, complete=true, data-testid='profile-photo-<uuid>'); other employees without photo showed fallback initials via data-testid='profile-photo-fallback-<name>'. Verified admin activity drawer opens for Raj (shows +91 98765 42100 · Central Market, today totals & collection history). Verified DOM contains NO 'storage_path', 'objstore', 'X-Storage-Key' or 'emergent_key' strings anywhere. Mobile (390x844): scrollWidth=406 vs clientWidth=390 = 16px horizontal overflow on admin dashboard.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/profile/photo", "issue": "Uses requests (sync) inside async endpoint - blocks the event loop for the duration of the object-storage PUT (up to 120s timeout). Should be run in a threadpool (fastapi.concurrency.run_in_threadpool) or migrate to httpx.AsyncClient. Same applies to download_photo in GET /api/files/{id}."},
+      {"endpoint": "storage.get_storage_key", "issue": "Global `storage_key` cache is never refreshed. If the upstream key expires or rotates, the process will keep sending a stale key until a restart. Consider TTL-based refresh or 401-on-upstream retry."},
+      {"endpoint": "POST /api/profile/photo", "issue": "Magic-bytes / real-image validation is not performed; only content-type header + declared size are checked. A malicious client can send arbitrary bytes with Content-Type: image/png. Server-side sniff (imghdr / PIL.Image.open) is recommended."},
+      {"endpoint": "POST /api/profile/photo", "issue": "Reads full file into memory before size check (`await file.read()` then len). For a 5 MB cap this is fine; for larger caps use streaming size check. Also, file.filename is unused - extension is derived from content-type which is fine."},
+      {"endpoint": "GET /api/files/{id}", "issue": "No Cache-Control header. Browser will re-download on every profile render (ProfilePhoto.jsx already blobs it once per mount, but a private, max-age=300 header would let the frontend cache across re-mounts)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin portal (mobile 390x844)", "issues": ["Horizontal overflow of ~16px (scrollWidth 406 vs clientWidth 390). Likely caused by the wide table (Collections feed / expense audit) or the .admin-intro layout. Consider `overflow-x: auto` on `.table-scroll` container or reducing horizontal padding at <=390px breakpoint."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml",
+    "/app/test_reports/pytest/pytest_photo.xml"
+  ],
+  "action_items": [
+    "(Optional but recommended) Wrap storage.upload_profile_photo / download_photo calls in fastapi.concurrency.run_in_threadpool so the event loop is not blocked during multi-second uploads.",
+    "(Optional) Add magic-byte validation (imghdr or PIL) in POST /api/profile/photo to defend against Content-Type spoofing.",
+    "(Optional) Refresh storage_key on 401/403 from upstream instead of caching for the process lifetime.",
+    "Fix mobile horizontal overflow on admin portal at 390px viewport (16px scroll)."
+  ],
+  "critical_code_review_comments": [
+    "storage.py: sync `requests.put/get` inside async FastAPI endpoints will block the event loop under load. Move to run_in_threadpool or async httpx.",
+    "storage.py: `storage_key` global cache with no invalidation is fragile - a single 401 from the upstream storage service will keep failing until pod restart.",
+    "router.py upload_own_photo: only trusts the client-declared Content-Type header. Real MIME sniffing would harden this.",
+    "router.py: photo_file_id is stored on employee record but there is no DB cleanup for orphaned file records if an employee is deleted; is_deleted flag is only set on replacement, not on employee removal (future concern).",
+    "ProfilePhoto.jsx: fetches the blob every time the component mounts (no in-memory cache). Fine for now, but on admin directory with N employees it triggers N parallel authenticated GETs on each render."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {"backend": "100% (43/43 executed, 1 skipped for seed-idempotency by design)", "frontend": "100% for photo flow (employee upload success toast, admin sees photo, activity drawer works, no secret leakage in DOM)"},
+  "test_credentials": "Admin 9999999999 / Admin@123. Employee Raj Mehta +91 98765 42100 / RajSecure@2026 (used successfully in UI test). Seeded Ananya/Vikram still on Welcome@123 (not touched).",
+  "seed_data_creation": "Test suite creates 2 employees per session (TEST_AuthEmp and TEST_OtherEmp) with uuid-random phones; uploads 2 profile photos (PNG then JPEG) for TEST_AuthEmp - the JPEG replaces the PNG and the PNG file record is soft-deleted (verified via 404). UI test uploaded 1 PNG for Raj Mehta.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "TestProfilePhoto class (13 tests) is in /app/backend/tests/backend_test.py. Uses `_PNG_1x1` and `_JPG_1x1` real image bytes. Fixture `new_employee` phone generation now uses uuid to be safe under pytest-xdist parallel execution. Photo endpoint contracts verified: POST /api/profile/photo (employee only, multipart 'file', returns {photo_file_id}), GET /api/files/{id} (owner or admin, returns image bytes). Employee `photo_file_id` field exposed on Employee model + /api/profile employee subdoc. Frontend components: ProfilePhoto.jsx renders <img data-testid='profile-photo-<fileId>'> or <span data-testid='profile-photo-fallback-<name>'>. Upload input at data-testid='profile-photo-input'. Mobile overflow on admin portal at 390px is a pre-existing responsive issue, not related to photo feature.",
+  "rca of the issue": "No functional defect found in the photo feature. Only pre-existing/minor findings: (a) sync HTTP calls inside async endpoints (blocks event loop under load), (b) storage-key cache never refreshes, (c) content-type header trusted without magic-byte sniff, (d) admin portal mobile overflow (unrelated). All 8 acceptance criteria in the review request pass end-to-end."
+}
