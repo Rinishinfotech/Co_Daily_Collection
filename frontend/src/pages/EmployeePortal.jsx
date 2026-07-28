@@ -17,6 +17,8 @@ export default function EmployeePortal({ employee, vendors, refreshKey, onDataCh
   const [expense, setExpense] = useState(emptyExpense);
   const [receipt, setReceipt] = useState(null);
   const [showExpense, setShowExpense] = useState(false);
+  const [showQuickVendor, setShowQuickVendor] = useState(false);
+  const [quickVendorName, setQuickVendorName] = useState("");
   const [passwordRequired, setPasswordRequired] = useState(mustChangePassword);
 
   useEffect(() => {
@@ -49,6 +51,22 @@ export default function EmployeePortal({ employee, vendors, refreshKey, onDataCh
 
   const updateCollection = (key, value) => setCollection((previous) => ({ ...previous, [key]: value }));
   const updateExpense = (key, value) => setExpense((previous) => ({ ...previous, [key]: value }));
+  const addQuickVendor = async () => {
+    if (quickVendorName.trim().length < 2) {
+      toast.error("Enter a vendor name first");
+      return;
+    }
+    try {
+      const { data } = await api.post("/vendors/quick-add", { name: quickVendorName.trim() });
+      setCollection((previous) => ({ ...previous, vendor_id: data.id, vendor_name: data.name }));
+      setQuickVendorName("");
+      setShowQuickVendor(false);
+      toast.success(`${data.business_name} is ready to select`);
+      onDataChange();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Could not add this vendor");
+    }
+  };
 
   return (
     <motion.main animate={{ opacity: 1, y: 0 }} className="employee-page" initial={{ opacity: 0, y: 10 }}>
@@ -71,7 +89,8 @@ export default function EmployeePortal({ employee, vendors, refreshKey, onDataCh
               {vendors.map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.business_name} · {vendor.name}</option>)}
             </select>
           </label>
-          <div className="form-or">or enter a new vendor</div>
+          <button className="form-or quick-vendor-toggle" data-testid="toggle-quick-vendor-button" type="button" onClick={() => setShowQuickVendor(!showQuickVendor)}>or add a new vendor</button>
+          {showQuickVendor && <div className="quick-vendor-form" data-testid="quick-vendor-form"><label>New vendor / business name<input data-testid="quick-vendor-name-input" placeholder="Business name" value={quickVendorName} onChange={(event) => setQuickVendorName(event.target.value)} /></label><button className="outline-button" data-testid="quick-vendor-save-button" type="button" onClick={addQuickVendor}>Add to vendors</button></div>}
           <label>Vendor name<input data-testid="collection-vendor-name-input" placeholder="Vendor name" value={collection.vendor_name} onChange={(event) => updateCollection("vendor_name", event.target.value)} /></label>
           <label>Collection amount<input required data-testid="collection-amount-input" min="1" placeholder="0" type="number" value={collection.amount} onChange={(event) => updateCollection("amount", event.target.value)} /></label>
           <label>Payment mode<select data-testid="collection-payment-mode-select" value={collection.payment_mode} onChange={(event) => updateCollection("payment_mode", event.target.value)}>{["Cash", "UPI", "Bank Transfer", "Cheque"].map((mode) => <option key={mode}>{mode}</option>)}</select></label>

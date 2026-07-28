@@ -15,6 +15,10 @@ class VendorCreate(BaseModel):
     address: str = Field(min_length=4, max_length=180)
 
 
+class QuickVendorCreate(BaseModel):
+    name: str = Field(min_length=2, max_length=100)
+
+
 class Vendor(VendorCreate):
     id: str = Field(default_factory=lambda: str(uuid4()))
     active: bool = True

@@ -9,7 +9,7 @@ from pymongo import ReturnDocument
 from starlette.responses import Response
 
 from auth import hash_password, sanitize_user
-from models import Collection, CollectionCreate, Employee, EmployeeCreate, Expense, ExpenseCreate, Vendor, VendorCreate
+from models import Collection, CollectionCreate, Employee, EmployeeCreate, Expense, ExpenseCreate, QuickVendorCreate, Vendor, VendorCreate
 from storage import download_photo, upload_profile_photo
 
 
@@ -84,6 +84,18 @@ def build_router(db, current_user):
     async def list_vendors(search: str = "", user: dict = Depends(current_user)):
         query = {"$or": [{"name": {"$regex": search, "$options": "i"}}, {"business_name": {"$regex": search, "$options": "i"}}]} if search else {}
         return await records(db.vendors, query)
+
+    @router.post("/vendors/quick-add", response_model=Vendor)
+    async def quick_add_vendor(payload: QuickVendorCreate, user: dict = Depends(current_user)):
+        if user["role"] != "employee":
+            raise HTTPException(status_code=403, detail="Quick vendor creation is available to field employees")
+        name = payload.name.strip()
+        existing = await db.vendors.find_one({"business_name": {"$regex": f"^{name}$", "$options": "i"}}, {"_id": 0})
+        if existing:
+            return existing
+        vendor = Vendor(name=name, business_name=name, phone="Not provided", address="Added from the field").model_dump()
+        await db.vendors.insert_one(vendor.copy())
+        return vendor
 
     @router.post("/vendors", response_model=Vendor)
     async def add_vendor(payload: VendorCreate, user: dict = Depends(current_user)):

@@ -428,3 +428,78 @@ class TestProfilePhoto:
         assert "storage_path" not in blob
         assert "objstore" not in blob
         assert "X-Storage-Key" not in blob
+
+
+
+# -- quick vendor (employee self-service add) ----------------------------
+class TestQuickVendor:
+    def test_employee_quick_add_creates_vendor(self, employee):
+        name = f"TEST_QuickVendor_{uuid.uuid4().hex[:8]}"
+        r = employee["session"].post(f"{API}/vendors/quick-add", json={"name": name})
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["business_name"].lower() == name.lower()
+        assert body["name"].lower() == name.lower()
+        assert "id" in body and isinstance(body["id"], str)
+        assert body.get("active") is True
+        assert body.get("phone")  # placeholder value fine
+        assert body.get("address")
+        # Persistence: list should contain it
+        listing = employee["session"].get(f"{API}/vendors", params={"search": name}).json()
+        assert any(v["id"] == body["id"] for v in listing), "quick vendor not persisted"
+
+    def test_quick_add_is_idempotent_same_name(self, employee):
+        name = f"TEST_Idem_{uuid.uuid4().hex[:6]}"
+        r1 = employee["session"].post(f"{API}/vendors/quick-add", json={"name": name})
+        r2 = employee["session"].post(f"{API}/vendors/quick-add", json={"name": name})
+        assert r1.status_code == 200 and r2.status_code == 200
+        assert r1.json()["id"] == r2.json()["id"], "duplicate vendor created for same name"
+
+    def test_quick_add_case_insensitive_idempotent(self, employee):
+        name = f"TEST_Case_{uuid.uuid4().hex[:6]}"
+        r1 = employee["session"].post(f"{API}/vendors/quick-add", json={"name": name.lower()})
+        r2 = employee["session"].post(f"{API}/vendors/quick-add", json={"name": name.upper()})
+        assert r1.status_code == 200 and r2.status_code == 200
+        assert r1.json()["id"] == r2.json()["id"], "case-variant produced duplicate"
+
+    def test_quick_add_rejects_short_name(self, employee):
+        r = employee["session"].post(f"{API}/vendors/quick-add", json={"name": "x"})
+        assert r.status_code == 422, r.text
+
+    def test_admin_cannot_use_quick_add(self, admin):
+        r = admin["session"].post(f"{API}/vendors/quick-add",
+                                  json={"name": f"TEST_AdminBlocked_{uuid.uuid4().hex[:6]}"})
+        assert r.status_code == 403, r.text
+
+    def test_quick_add_requires_auth(self):
+        r = requests.post(f"{API}/vendors/quick-add", json={"name": "TEST_Anon_Vendor"})
+        assert r.status_code == 401
+
+    def test_employee_still_blocked_from_full_vendor_management(self, employee, admin):
+        # Regression: quick-add must NOT weaken admin-only mgmt.
+        payload = {"name": "TESTFullMgmt", "business_name": "TESTFullBiz",
+                   "phone": "9111111111", "address": "somewhere else"}
+        r = employee["session"].post(f"{API}/vendors", json=payload)
+        assert r.status_code == 403, r.text
+        vendors = admin["session"].get(f"{API}/vendors").json()
+        vid = vendors[0]["id"]
+        assert employee["session"].put(f"{API}/vendors/{vid}", json=payload).status_code == 403
+        assert employee["session"].delete(f"{API}/vendors/{vid}").status_code == 403
+
+    def test_collection_can_be_created_with_quick_vendor(self, employee):
+        # Employee auth may still require must_change_password? Let's use a fresh employee that has already been used
+        # for TestAuth (test_employee_must_change_password_flag). Collections endpoint doesn't require password change,
+        # so should work. If it fails we skip gracefully.
+        name = f"TEST_CollectVendor_{uuid.uuid4().hex[:6]}"
+        r = employee["session"].post(f"{API}/vendors/quick-add", json={"name": name})
+        assert r.status_code == 200, r.text
+        vendor = r.json()
+        c = employee["session"].post(
+            f"{API}/collections",
+            json={"vendor_id": vendor["id"], "vendor_name": vendor["name"],
+                  "amount": 12.5, "payment_mode": "Cash", "remarks": "TEST"},
+        )
+        assert c.status_code == 200, c.text
+        body = c.json()
+        assert body["vendor_id"] == vendor["id"]
+        assert body["amount"] == 12.5
