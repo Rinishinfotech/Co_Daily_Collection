@@ -1,54 +1,34 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import "@/App.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import axios from "axios";
-import { HOME } from "@/constants/testIds";
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
-
-const Home = () => {
-  const helloWorldApi = async () => {
-    try {
-      const response = await axios.get(`${API}/`);
-      console.log(response.data.message);
-    } catch (e) {
-      console.error(e, `errored out requesting / api`);
-    }
-  };
-
-  useEffect(() => {
-    helloWorldApi();
-  }, []);
-
-  return (
-    <div>
-      <header className="App-header">
-        <a
-          data-testid={HOME.emergentLink}
-          className="App-link"
-          href="https://emergent.sh"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <img src="https://avatars.githubusercontent.com/in/1201222?s=120&u=2686cf91179bbafbc7a71bfbc43004cf9ae1acea&v=4" />
-        </a>
-        <p className="mt-5">Building something incredible ~!</p>
-      </header>
-    </div>
-  );
-};
+import { Toaster } from "sonner";
+import PortalHeader from "@/components/PortalHeader";
+import EmployeePortal from "@/pages/EmployeePortal";
+import AdminPortal from "@/pages/AdminPortal";
+import { api } from "@/lib/api";
 
 function App() {
+  const [view, setView] = useState("employee");
+  const [vendors, setVendors] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [employee, setEmployee] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const refresh = () => setRefreshKey((value) => value + 1);
+
+  useEffect(() => {
+    Promise.all([api.get("/vendors"), api.get("/employees")]).then(([vendorResponse, employeeResponse]) => {
+      setVendors(vendorResponse.data);
+      setEmployees(employeeResponse.data);
+      setEmployee((current) => current || employeeResponse.data[0]);
+    });
+  }, [refreshKey]);
+
+  if (!employee) return <div className="loading-screen" data-testid="app-loading">Loading LedgerFlow…</div>;
+
   return (
-    <div className="App">
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Home />}>
-            <Route index element={<Home />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+    <div className={`app-shell ${view === "admin" ? "admin-shell" : "employee-shell"}`}>
+      <PortalHeader employee={employee} employees={employees} setEmployee={setEmployee} setView={setView} view={view} />
+      {view === "employee" ? <EmployeePortal employee={employee} vendors={vendors} refreshKey={refreshKey} onDataChange={refresh} /> : <AdminPortal employees={employees} vendors={vendors} refreshKey={refreshKey} onDataChange={refresh} />}
+      <Toaster position="top-right" richColors />
     </div>
   );
 }
