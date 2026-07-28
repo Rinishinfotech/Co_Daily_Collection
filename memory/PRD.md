@@ -43,6 +43,9 @@ Build a production-ready money collection management app for field agents and ad
 - Digital receipts can be shared as a one-page PDF through the mobile share menu, including WhatsApp when selected by the employee.
 - Receipt download and print actions now generate only the displayed receipt rather than the application page.
 
+## Feature Added — 2026-07-28
+- The login page now offers a dedicated employee sign-in view beneath the main sign-in action while retaining phone-and-password verification.
+
 ## Prioritized Backlog
 ### P0
 - None.
