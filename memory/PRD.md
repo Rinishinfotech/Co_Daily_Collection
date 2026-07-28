@@ -39,6 +39,10 @@ Build a production-ready money collection management app for field agents and ad
 - Field employees can quick-add a vendor from the collection form; the new vendor is immediately selected and available in the vendor list.
 - Quick-add normalizes names, prevents duplicate records, and preserves full vendor management permissions for administrators only.
 
+## Feature Added — 2026-07-28
+- Digital receipts can be shared as a one-page PDF through the mobile share menu, including WhatsApp when selected by the employee.
+- Receipt download and print actions now generate only the displayed receipt rather than the application page.
+
 ## Prioritized Backlog
 ### P0
 - None.
