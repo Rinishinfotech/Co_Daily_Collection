@@ -5,6 +5,8 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
+from auth import auth_dependency
+from auth_routes import build_auth_router
 from router import build_router
 from seed import seed_database
 
@@ -20,7 +22,9 @@ db = client[os.environ['DB_NAME']]
 # Create the main app without a prefix
 app = FastAPI()
 
-app.include_router(build_router(db))
+current_user = auth_dependency(db)
+app.include_router(build_auth_router(db, current_user))
+app.include_router(build_router(db, current_user))
 
 
 @app.on_event("startup")

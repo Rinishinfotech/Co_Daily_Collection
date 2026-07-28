@@ -3,12 +3,13 @@ import { motion } from "framer-motion";
 import { ArrowUpRight, BadgeIndianRupee, MapPin, Plus, ReceiptText, WalletCards } from "lucide-react";
 import { toast } from "sonner";
 import ReceiptDialog from "@/components/ReceiptDialog";
+import ChangePasswordDialog from "@/components/ChangePasswordDialog";
 import { api, currency, dateTime } from "@/lib/api";
 
 const emptyCollection = { vendor_id: "", vendor_name: "", amount: "", payment_mode: "UPI", remarks: "" };
 const emptyExpense = { category: "Fuel", amount: "", remarks: "" };
 
-export default function EmployeePortal({ employee, vendors, refreshKey, onDataChange }) {
+export default function EmployeePortal({ employee, vendors, refreshKey, onDataChange, mustChangePassword, onPasswordChanged }) {
   const [dashboard, setDashboard] = useState(null);
   const [collections, setCollections] = useState([]);
   const [expenses, setExpenses] = useState([]);
@@ -16,6 +17,7 @@ export default function EmployeePortal({ employee, vendors, refreshKey, onDataCh
   const [expense, setExpense] = useState(emptyExpense);
   const [receipt, setReceipt] = useState(null);
   const [showExpense, setShowExpense] = useState(false);
+  const [passwordRequired, setPasswordRequired] = useState(mustChangePassword);
 
   useEffect(() => {
     Promise.all([api.get(`/dashboard?employee_id=${employee.id}`), api.get(`/collections?employee_id=${employee.id}`), api.get(`/expenses?employee_id=${employee.id}`)]).then(([dash, col, exp]) => {
@@ -83,6 +85,7 @@ export default function EmployeePortal({ employee, vendors, refreshKey, onDataCh
         <div className="expense-list">{expenses.slice(0, 3).map((item) => <article className="expense-row" data-testid={`expense-${item.id}`} key={item.id}><span>{item.category}</span><span>{item.remarks || "Field cost"}</span><b>{currency(item.amount)}</b></article>)}</div>
       </section>
       <ReceiptDialog receipt={receipt} onClose={() => setReceipt(null)} />
+      {passwordRequired && <ChangePasswordDialog onComplete={() => { setPasswordRequired(false); onPasswordChanged(); }} />}
     </motion.main>
   );
 }

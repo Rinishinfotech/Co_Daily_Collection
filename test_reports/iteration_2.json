@@ -1,0 +1,45 @@
+{
+  "summary": "Backend + frontend E2E for new secure auth workflow. Backend: 31/31 pytest cases pass covering login (admin/employee/invalid), /auth/me, /auth/change-password, /profile, role isolation (employee blocked from GET /employees, add employee, vendor create/update/delete, other-employee activity/collections/dashboard; admin blocked from POST collections/expenses), admin-only employee activity endpoint, dashboard, duplicate-phone rejection, employee scoping of dashboard/collections, identity spoofing prevention on POST /collections & /expenses, logout. Frontend: admin login->admin profile shows 'Administrator account'; logout returns to login; new employee created via admin API and can log in through the UI, sees forced ChangePasswordDialog, submits new password successfully, portal switches to Employee view (name/territory shown). Server-side 403 confirmed from the employee's browser session for /employees, /employees/emp-raj/activity, /collections?employee_id=emp-raj, /dashboard?employee_id=emp-raj, POST /vendors. Identity spoof attempt on POST /collections rejected: server overwrote employee_id/employee_name with the signed-in user. Mobile (390x844) login page has no horizontal overflow. Fixed one critical model-definition bug during testing.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/collections and POST /api/expenses", "issue": "Collection and Expense pydantic models did not declare employee_id/employee_name fields. Because pydantic v2 ignores extra kwargs by default, router.py's `Collection(**payload.model_dump(), employee_id=user['employee_id'], employee_name=user['name'], ...)` silently DROPPED the identity fields before insert. Result: every newly created collection/expense was persisted without an employee_id, making them invisible to employee-scoped queries and un-attributable in admin activity. This directly defeated requirement #6 ('employee identity is enforced server-side even when payload tries another identity'). FIXED by testing agent: added `employee_id: str` and `employee_name: str` to Collection and Expense models in /app/backend/models.py.", "priority": "CRITICAL"}
+    ],
+    "minor": [
+      {"endpoint": "startup / seed_database", "issue": "Seed is idempotent (only inserts users if not exists). If a testing agent changes the seeded employee's Welcome@123 password once, subsequent runs of the seeded-employee login test will 401. `test_seeded_employee_login_and_flag` handles this via pytest.skip, but a hard reset endpoint (or a flag) would make regression runs deterministic."},
+      {"endpoint": "startup / cleanup", "issue": "Legacy collections/expenses created before the model fix would fail response_model validation forever. Testing agent purged 1 collection + 1 expense that lacked employee_id/employee_name. Prod-safety: consider a one-shot migration/backfill if this app is fielded with existing data."},
+      {"endpoint": "CORS", "issue": "backend/.env sets CORS_ORIGINS=* while server.py uses allow_credentials=True. Browsers reject wildcard-with-credentials, so httpOnly cookie login is effectively non-functional cross-origin (the Bearer-token fallback saves the frontend). Set CORS_ORIGINS explicitly to REACT_APP_BACKEND_URL for prod."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Confirm/keep the models.py additions (employee_id, employee_name on Collection & Expense) — these are required for the security guarantee to hold.",
+    "Tighten CORS: replace '*' with the explicit frontend origin so httpOnly cookies work cross-origin.",
+    "(Optional) Add a data-migration step for pre-existing collections/expenses without employee_id, or make the fields Optional[str] with a placeholder to avoid response_validation 500s in the wild."
+  ],
+  "critical_code_review_comments": [
+    "models.py: Collection & Expense were missing employee_id/employee_name fields — biggest issue, fixed.",
+    "auth.py: require_admin is a no-op (`Depends(lambda: None)`). Not currently used but leaving it there invites accidental use. Delete or wire to `current_user` with a role assertion.",
+    "auth_routes.py login: response.set_cookie uses secure=True — correct for prod, but ensure REACT_APP_BACKEND_URL is always https in dev/preview (it is here).",
+    "router.py update_employee resets password_hash and must_change_password=True on EVERY edit (name/territory changes) because payload.temporary_password is required. Splitting into a 'reset password' endpoint would avoid forcing password resets on trivial edits.",
+    "router.py: extra fields on CollectionCreate/ExpenseCreate are silently dropped by pydantic — combined with the model-drop bug this was catastrophic. Consider `model_config = ConfigDict(extra='forbid')` on the *Create schemas so spoof attempts get a 422 instead of being silently overridden.",
+    "seed.py is not idempotent for passwords — if seed employee password is rotated, seed doesn't re-establish Welcome@123. Playbook step #5 expects idempotency."
+  ],
+  "updated_files": [
+    "/app/backend/models.py",
+    "/app/backend/tests/backend_test.py",
+    "/app/memory/test_credentials.md",
+    "/app/test_reports/iteration_2.json"
+  ],
+  "success_rate": {"backend": "100% (31/31)", "frontend": "100% for the security flow (admin login/profile/logout, employee login+forced password change, all 5 admin routes 403 for employee, spoof rejected, mobile overflow OK)"},
+  "test_credentials": "Admin phone 9999999999 / Admin@123 (unchanged). Seeded employees still on Welcome@123 (not touched by tests). Test suite creates its own employee each run and changes password to NewPass@2026 for that ephemeral account.",
+  "seed_data_creation": "Test suite creates a TEST_AuthEmp employee (phone +91 900000XXXX) per session and posts one TEST_ collection + one TEST_ expense. UI test creates a TEST_UI_<ts> employee and completes forced password change.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "backend_test.py now uses Bearer-token auth end-to-end and exercises: login (admin+employee+invalid), me, change-password, role isolation, admin flows, identity-spoof prevention, logout. All 31 tests pass after the models.py fix. If you regenerate seed data, verify Collection/Expense responses still contain employee_id/employee_name. Playwright script must clear cookies (context.clear_cookies) — clearing localStorage alone is insufficient because login sets httpOnly access_token cookie.",
+  "rca of the issue": "Collection(CollectionCreate) declared only id/receipt_number/created_at. Router code passed employee_id/employee_name as kwargs, but pydantic v2 defaults to 'ignore' for undeclared fields → both were dropped before insert. Consequence: every newly created record lost its owning employee, so (a) employee-scoped list_collections returned nothing for the creator, (b) admin activity aggregations were broken, (c) requirement #6 (server-side identity enforcement) failed by omission — there was no identity to enforce. Repro before fix: POST /api/collections as employee → 200 but response has no employee_id key; DB row also lacks it. Mitigation: added `employee_id: str` and `employee_name: str` fields to both Collection and Expense models. Post-fix retest: identity spoof attempts (payload sending employee_id='emp-raj', employee_name='SPOOF') return 200 with the signed-in employee's real id/name, and employee-scoped list endpoints return the new records."
+}

@@ -23,6 +23,12 @@ Build a production-ready money collection management app for field agents and ad
 - Real-time receipt preview, WhatsApp sharing, print action, CSV export, dashboard refreshes, and management forms.
 - End-to-end validation completed for all major flows.
 
+## Feature Added — 2026-07-28
+- Secure phone number and password sign-in for administrators and field employees.
+- Administrator-created employee accounts with temporary passwords and a required first-login password change.
+- Server-side role protection isolates each employee to their own profile, collections, expenses, and dashboard.
+- Administrators can open an employee profile and daily activity report listing collection amounts and vendors.
+
 ## Prioritized Backlog
 ### P0
 - None.

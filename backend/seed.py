@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
+from auth import hash_password
+
 
 EMPLOYEES = [
     {"id": "emp-raj", "name": "Raj Mehta", "phone": "+91 98765 42100", "territory": "Central Market", "active": True, "avatar": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=160&q=80"},
@@ -41,3 +43,10 @@ async def seed_database(db):
         await db.employees.insert_many(EMPLOYEES)
         await db.collections.insert_many(sample_collections())
         await db.expenses.insert_many(sample_expenses())
+    admin = await db.users.find_one({"phone": "9999999999"})
+    if not admin:
+        await db.users.insert_one({"id": "admin-root", "name": "LedgerFlow Admin", "phone": "9999999999", "role": "admin", "active": True, "must_change_password": False, "password_hash": hash_password("Admin@123"), "created_at": datetime.now(timezone.utc).isoformat()})
+    for employee in EMPLOYEES:
+        existing = await db.users.find_one({"id": employee["id"]})
+        if not existing:
+            await db.users.insert_one({"id": employee["id"], "name": employee["name"], "phone": employee["phone"], "role": "employee", "employee_id": employee["id"], "active": True, "must_change_password": True, "password_hash": hash_password("Welcome@123"), "created_at": datetime.now(timezone.utc).isoformat()})

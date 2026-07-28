@@ -24,10 +24,14 @@ class EmployeeCreate(BaseModel):
     name: str = Field(min_length=2, max_length=80)
     phone: str = Field(min_length=8, max_length=20)
     territory: str = Field(min_length=2, max_length=80)
+    temporary_password: str = Field(min_length=8, max_length=100)
 
 
-class Employee(EmployeeCreate):
+class Employee(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
+    name: str
+    phone: str
+    territory: str
     active: bool = True
     avatar: Optional[str] = None
 
@@ -38,12 +42,12 @@ class CollectionCreate(BaseModel):
     amount: float = Field(gt=0)
     payment_mode: PaymentMode
     remarks: str = Field(default="", max_length=240)
-    employee_id: str
-    employee_name: str
 
 
 class Collection(CollectionCreate):
     id: str = Field(default_factory=lambda: str(uuid4()))
+    employee_id: str
+    employee_name: str
     receipt_number: str
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
@@ -52,11 +56,11 @@ class ExpenseCreate(BaseModel):
     category: str = Field(min_length=2, max_length=60)
     amount: float = Field(gt=0)
     remarks: str = Field(default="", max_length=240)
-    employee_id: str
-    employee_name: str
     date: Optional[str] = None
 
 
 class Expense(ExpenseCreate):
     id: str = Field(default_factory=lambda: str(uuid4()))
+    employee_id: str
+    employee_name: str
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
