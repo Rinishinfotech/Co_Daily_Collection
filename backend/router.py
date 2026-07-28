@@ -1,7 +1,10 @@
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
+import imghdr
+
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from pymongo import ReturnDocument
 from starlette.responses import Response
 
@@ -43,13 +46,16 @@ def build_router(db, current_user):
         if user["role"] != "employee":
             raise HTTPException(status_code=403, detail="Only employee accounts can update profile photos")
         allowed_types = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+        image_kinds = {"image/jpeg": "jpeg", "image/png": "png", "image/webp": "webp"}
         if file.content_type not in allowed_types:
             raise HTTPException(status_code=400, detail="Upload a JPG, PNG, or WebP image")
         contents = await file.read()
         if not contents or len(contents) > 5 * 1024 * 1024:
             raise HTTPException(status_code=400, detail="Profile photos must be smaller than 5 MB")
+        if imghdr.what(None, contents) != image_kinds[file.content_type]:
+            raise HTTPException(status_code=400, detail="The uploaded file is not a valid image")
         try:
-            storage_path = upload_profile_photo(user["employee_id"], contents, allowed_types[file.content_type], file.content_type)
+            storage_path = await run_in_threadpool(upload_profile_photo, user["employee_id"], contents, allowed_types[file.content_type], file.content_type)
         except Exception as error:
             raise HTTPException(status_code=502, detail="Photo storage is temporarily unavailable") from error
         file_id = str(uuid4())
@@ -69,10 +75,10 @@ def build_router(db, current_user):
         if user["role"] != "admin" and record["owner_employee_id"] != user["employee_id"]:
             raise HTTPException(status_code=403, detail="You can only view your own profile photo")
         try:
-            contents, content_type = download_photo(record["storage_path"])
+            contents, content_type = await run_in_threadpool(download_photo, record["storage_path"])
         except Exception as error:
             raise HTTPException(status_code=502, detail="Photo storage is temporarily unavailable") from error
-        return Response(content=contents, media_type=content_type)
+        return Response(content=contents, media_type=content_type, headers={"Cache-Control": "private, max-age=300"})
 
     @router.get("/vendors", response_model=list[Vendor])
     async def list_vendors(search: str = "", user: dict = Depends(current_user)):

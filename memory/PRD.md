@@ -33,6 +33,7 @@ Build a production-ready money collection management app for field agents and ad
 ## Feature Added — 2026-07-28
 - Employees can securely upload JPG, PNG, or WebP profile photos up to 5 MB.
 - Photos are private: employees may update/view only their own photo, while administrators can view team photos in employee records.
+- Uploads validate real image data, run storage transfers without blocking the app, refresh expired storage sessions, and cache private photo responses briefly.
 
 ## Prioritized Backlog
 ### P0

@@ -9,9 +9,9 @@ APP_NAME = "ledgerflow-collections"
 storage_key = None
 
 
-def get_storage_key():
+def get_storage_key(force_refresh=False):
     global storage_key
-    if storage_key:
+    if storage_key and not force_refresh:
         return storage_key
     response = requests.post(
         f"{STORAGE_URL}/init",
@@ -25,21 +25,27 @@ def get_storage_key():
 
 def upload_profile_photo(employee_id: str, data: bytes, extension: str, content_type: str):
     path = f"{APP_NAME}/profile-photos/{employee_id}/{uuid4()}.{extension}"
-    response = requests.put(
-        f"{STORAGE_URL}/objects/{path}",
-        headers={"X-Storage-Key": get_storage_key(), "Content-Type": content_type},
-        data=data,
-        timeout=120,
-    )
+    for attempt in range(2):
+        response = requests.put(
+            f"{STORAGE_URL}/objects/{path}",
+            headers={"X-Storage-Key": get_storage_key(force_refresh=attempt == 1), "Content-Type": content_type},
+            data=data,
+            timeout=120,
+        )
+        if response.status_code not in {401, 403}:
+            response.raise_for_status()
+            return response.json()["path"]
     response.raise_for_status()
-    return response.json()["path"]
 
 
 def download_photo(path: str):
-    response = requests.get(
-        f"{STORAGE_URL}/objects/{path}",
-        headers={"X-Storage-Key": get_storage_key()},
-        timeout=60,
-    )
+    for attempt in range(2):
+        response = requests.get(
+            f"{STORAGE_URL}/objects/{path}",
+            headers={"X-Storage-Key": get_storage_key(force_refresh=attempt == 1)},
+            timeout=60,
+        )
+        if response.status_code not in {401, 403}:
+            response.raise_for_status()
+            return response.content, response.headers.get("Content-Type", "application/octet-stream")
     response.raise_for_status()
-    return response.content, response.headers.get("Content-Type", "application/octet-stream")
