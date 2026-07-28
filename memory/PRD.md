@@ -35,6 +35,10 @@ Build a production-ready money collection management app for field agents and ad
 - Photos are private: employees may update/view only their own photo, while administrators can view team photos in employee records.
 - Uploads validate real image data, run storage transfers without blocking the app, refresh expired storage sessions, and cache private photo responses briefly.
 
+## Feature Added — 2026-07-28
+- Field employees can quick-add a vendor from the collection form; the new vendor is immediately selected and available in the vendor list.
+- Quick-add normalizes names, prevents duplicate records, and preserves full vendor management permissions for administrators only.
+
 ## Prioritized Backlog
 ### P0
 - None.

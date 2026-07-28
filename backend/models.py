@@ -19,9 +19,14 @@ class QuickVendorCreate(BaseModel):
     name: str = Field(min_length=2, max_length=100)
 
 
-class Vendor(VendorCreate):
+class Vendor(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
+    name: str
+    business_name: str
+    phone: str = ""
+    address: str = ""
     active: bool = True
+    source: str = "admin"
 
 
 class EmployeeCreate(BaseModel):

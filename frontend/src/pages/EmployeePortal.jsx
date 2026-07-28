@@ -86,7 +86,7 @@ export default function EmployeePortal({ employee, vendors, refreshKey, onDataCh
           <label>Vendor
             <select required data-testid="collection-vendor-select" value={collection.vendor_id} onChange={(event) => updateCollection("vendor_id", event.target.value)}>
               <option value="">Choose from your vendors</option>
-              {vendors.map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.business_name} · {vendor.name}</option>)}
+              {vendors.map((vendor) => <option key={vendor.id} value={vendor.id}>{`${vendor.business_name} · ${vendor.name}`}</option>)}
             </select>
           </label>
           <button className="form-or quick-vendor-toggle" data-testid="toggle-quick-vendor-button" type="button" onClick={() => setShowQuickVendor(!showQuickVendor)}>or add a new vendor</button>

@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+import re
 from uuid import uuid4
 
 import imghdr
@@ -89,11 +90,11 @@ def build_router(db, current_user):
     async def quick_add_vendor(payload: QuickVendorCreate, user: dict = Depends(current_user)):
         if user["role"] != "employee":
             raise HTTPException(status_code=403, detail="Quick vendor creation is available to field employees")
-        name = payload.name.strip()
-        existing = await db.vendors.find_one({"business_name": {"$regex": f"^{name}$", "$options": "i"}}, {"_id": 0})
+        name = " ".join(payload.name.split())
+        existing = await db.vendors.find_one({"business_name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}}, {"_id": 0})
         if existing:
-            return existing
-        vendor = Vendor(name=name, business_name=name, phone="Not provided", address="Added from the field").model_dump()
+            return Vendor(**{**existing, "name": existing.get("name", name), "business_name": existing.get("business_name", name)}).model_dump()
+        vendor = Vendor(name=name, business_name=name, source="quick-add").model_dump()
         await db.vendors.insert_one(vendor.copy())
         return vendor
 
