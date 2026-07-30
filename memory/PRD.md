@@ -1,4 +1,4 @@
-# LedgerFlow Collections PRD
+# Co. Daily Collection PRD
 
 ## Original Problem Statement
 Build a production-ready money collection management app for field agents and administrators, with mobile employee workflows, admin analytics, digital receipts, WhatsApp sharing, expenses, and seeded realistic data.

@@ -31,7 +31,7 @@ function App() {
     });
   }, [user, refreshKey]);
 
-  if (user === null) return <div className="loading-screen" data-testid="app-loading">Loading LedgerFlow…</div>;
+  if (user === null) return <div className="loading-screen" data-testid="app-loading">Loading Co. Daily Collection…</div>;
   if (user === false) return <LoginPage onLogin={(data) => { setAuthToken(data.token); setUser(data.user); }} />;
   const logout = async () => { try { await api.post("/auth/logout"); } finally { setAuthToken(null); setUser(false); setProfile(null); } };
 

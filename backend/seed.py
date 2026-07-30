@@ -45,7 +45,9 @@ async def seed_database(db):
         await db.expenses.insert_many(sample_expenses())
     admin = await db.users.find_one({"phone": "9999999999"})
     if not admin:
-        await db.users.insert_one({"id": "admin-root", "name": "LedgerFlow Admin", "phone": "9999999999", "role": "admin", "active": True, "must_change_password": False, "password_hash": hash_password("Admin@123"), "created_at": datetime.now(timezone.utc).isoformat()})
+        await db.users.insert_one({"id": "admin-root", "name": "Co. Daily Collection Admin", "phone": "9999999999", "role": "admin", "active": True, "must_change_password": False, "password_hash": hash_password("Admin@123"), "created_at": datetime.now(timezone.utc).isoformat()})
+    else:
+        await db.users.update_one({"id": "admin-root"}, {"$set": {"name": "Co. Daily Collection Admin"}})
     for employee in EMPLOYEES:
         existing = await db.users.find_one({"id": employee["id"]})
         if not existing:

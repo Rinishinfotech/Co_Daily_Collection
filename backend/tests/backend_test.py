@@ -1,4 +1,4 @@
-"""Backend API tests for LedgerFlow with authentication + role isolation."""
+"""Backend API tests for Co. Daily Collection with authentication + role isolation."""
 import os
 import time
 import uuid

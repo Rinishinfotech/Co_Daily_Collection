@@ -5,7 +5,7 @@ import { currency, dateTime } from "@/lib/api";
 export default function ReceiptDialog({ receipt, onClose }) {
   if (!receipt) return null;
 
-  const fileName = `LedgerFlow-${receipt.receipt_number}.pdf`;
+  const fileName = `Co-Daily-Collection-${receipt.receipt_number}.pdf`;
 
   const buildReceiptPdf = () => {
     const pdf = new jsPDF({ format: "a5", orientation: "portrait", unit: "mm" });
@@ -23,7 +23,7 @@ export default function ReceiptDialog({ receipt, onClose }) {
     pdf.setTextColor(255, 255, 255);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(14);
-    pdf.text("LEDGERFLOW COLLECTIONS", width / 2, 16, { align: "center" });
+    pdf.text("CO. DAILY COLLECTION", width / 2, 16, { align: "center" });
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(8);
     pdf.text("DIGITAL PAYMENT RECEIPT", width / 2, 23, { align: "center" });
@@ -67,7 +67,7 @@ export default function ReceiptDialog({ receipt, onClose }) {
     const file = new File([blob], fileName, { type: "application/pdf" });
     if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
       try {
-        await navigator.share({ files: [file], title: "LedgerFlow receipt" });
+        await navigator.share({ files: [file], title: "Co. Daily Collection receipt" });
         return;
       } catch (error) {
         if (error.name === "AbortError") return;
@@ -91,7 +91,7 @@ export default function ReceiptDialog({ receipt, onClose }) {
         <button aria-label="Close receipt" className="icon-button receipt-close" data-testid="receipt-close-button" onClick={onClose}>
           <X size={20} />
         </button>
-        <div className="receipt-brand" data-testid="receipt-company-name">LEDGERFLOW COLLECTIONS</div>
+        <div className="receipt-brand" data-testid="receipt-company-name">CO. DAILY COLLECTION</div>
         <div className="receipt-rule" />
         <p className="receipt-label" data-testid="receipt-number-label">RECEIPT NO.</p>
         <p className="receipt-id" data-testid="receipt-number">{receipt.receipt_number}</p>
