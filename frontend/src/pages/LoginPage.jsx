@@ -33,7 +33,7 @@ export default function LoginPage({ onLogin }) {
       <section className="login-panel">
         <div className="login-brand" data-testid="login-brand">
           <Landmark size={24} />
-          <span>LedgerFlow</span>
+          <span>Co. Daily Collection</span>
         </div>
         <p className="eyebrow">{employeeMode ? "EMPLOYEE ACCESS" : "SECURE COLLECTION ACCESS"}</p>
         <h1>{employeeMode ? "Employee sign-in." : "Sign in to your field desk."}</h1>

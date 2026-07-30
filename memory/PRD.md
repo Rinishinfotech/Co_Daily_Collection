@@ -58,3 +58,6 @@ Build a production-ready money collection management app for field agents and ad
 ## Next Tasks
 - Gather feedback from field agents on the collection form and receipt layout.
 - Expand reporting filters and add downloadable administrative summaries.
+
+## Visual Update — 2026-07-28
+- Login page brand label changed to Co. Daily Collection.
