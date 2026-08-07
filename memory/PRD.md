@@ -61,3 +61,7 @@ Build a production-ready money collection management app for field agents and ad
 
 ## Visual Update — 2026-07-28
 - Login page brand label changed to Co. Daily Collection.
+
+## Bug Fix — 2026-08-03
+- Production deployment startup now preserves Kubernetes-provided database settings instead of overriding them with local values.
+- Cross-origin access is configured for production-facing app domains.
