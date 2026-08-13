@@ -36,6 +36,10 @@ class EmployeeCreate(BaseModel):
     temporary_password: str = Field(min_length=8, max_length=100)
 
 
+class EmployeePasswordReset(BaseModel):
+    temporary_password: str = Field(min_length=8, max_length=100)
+
+
 class Employee(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     name: str

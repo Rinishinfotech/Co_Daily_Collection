@@ -69,3 +69,7 @@ Build a production-ready money collection management app for field agents and ad
 ## Feature Update — 2026-08-03
 - Removed the daily expense workflow, expense dashboards, audit table, and API actions from the product.
 - Added administrator-only employee account deletion with secure cleanup of linked sign-in access and profile photos.
+
+## Production Readiness Update — 2026-08-03
+- Optimized dashboard and employee activity reads to fetch only the collection fields needed for calculations and display.
+- The application continues to use the existing MongoDB database without destructive migration or reset steps.

@@ -10,15 +10,18 @@ from pymongo import ReturnDocument
 from starlette.responses import Response
 
 from auth import hash_password, sanitize_user
-from models import Collection, CollectionCreate, Employee, EmployeeCreate, QuickVendorCreate, Vendor, VendorCreate
+from models import Collection, CollectionCreate, Employee, EmployeeCreate, EmployeePasswordReset, QuickVendorCreate, Vendor, VendorCreate
 from storage import download_photo, upload_profile_photo
 
 
 def build_router(db, current_user):
     router = APIRouter(prefix="/api")
 
-    async def records(collection, query=None, limit=200):
-        return await collection.find(query or {}, {"_id": 0}).sort("created_at", -1).to_list(limit)
+    async def records(collection, query=None, limit=200, projection=None):
+        fields = {"_id": 0}
+        if projection:
+            fields.update(projection)
+        return await collection.find(query or {}, fields).sort("created_at", -1).to_list(limit)
 
     def admin_only(user):
         if user["role"] != "admin":
@@ -152,6 +155,20 @@ def build_router(db, current_user):
         await db.users.update_one({"id": employee_id}, {"$set": {"name": payload.name, "phone": payload.phone.strip(), "password_hash": hash_password(payload.temporary_password), "must_change_password": True}})
         return result
 
+    @router.post("/employees/{employee_id}/reset-password")
+    async def reset_employee_password(employee_id: str, payload: EmployeePasswordReset, user: dict = Depends(current_user)):
+        admin_only(user)
+        employee = await db.employees.find_one({"id": employee_id}, {"_id": 0, "id": 1, "name": 1})
+        if not employee:
+            raise HTTPException(status_code=404, detail="Employee not found")
+        result = await db.users.update_one(
+            {"id": employee_id, "role": "employee"},
+            {"$set": {"password_hash": hash_password(payload.temporary_password), "must_change_password": True, "updated_at": datetime.now(timezone.utc).isoformat()}},
+        )
+        if not result.matched_count:
+            raise HTTPException(status_code=404, detail="Employee sign-in account not found")
+        return {"ok": True, "employee_name": employee["name"]}
+
     @router.delete("/employees/{employee_id}")
     async def remove_employee(employee_id: str, user: dict = Depends(current_user)):
         admin_only(user)
@@ -169,7 +186,12 @@ def build_router(db, current_user):
         employee = await db.employees.find_one({"id": employee_id}, {"_id": 0})
         if not employee:
             raise HTTPException(status_code=404, detail="Employee not found")
-        collections = await records(db.collections, {"employee_id": employee_id}, 500)
+        collections = await records(
+            db.collections,
+            {"employee_id": employee_id},
+            500,
+            {"id": 1, "vendor_id": 1, "vendor_name": 1, "payment_mode": 1, "amount": 1, "created_at": 1},
+        )
         today = datetime.now(timezone.utc).date().isoformat()
         today_collections = [item for item in collections if item["created_at"].startswith(today)]
         return {"employee": employee, "today_total": sum(item["amount"] for item in today_collections), "today_vendors": len(set(item.get("vendor_id") for item in today_collections if item.get("vendor_id"))), "collections": collections}
@@ -199,7 +221,12 @@ def build_router(db, current_user):
         today = datetime.now(timezone.utc).date().isoformat()
         month = today[:7]
         collection_query = {"employee_id": scope_id} if scope_id else {}
-        all_collections = await records(db.collections, collection_query, 1000)
+        all_collections = await records(
+            db.collections,
+            collection_query,
+            1000,
+            {"amount": 1, "created_at": 1, "vendor_id": 1},
+        )
         today_collections = [item for item in all_collections if item["created_at"].startswith(today)]
         month_collections = [item for item in all_collections if item["created_at"].startswith(month)]
         trend = []
