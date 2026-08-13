@@ -101,6 +101,7 @@ def build_router(db, current_user):
             name=name,
             business_name=name,
             phone="Pending update",
+            address="Pending update",
             source="quick-add",
         ).model_dump()
         await db.vendors.insert_one(vendor.copy())

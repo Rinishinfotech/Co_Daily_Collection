@@ -73,3 +73,7 @@ Build a production-ready money collection management app for field agents and ad
 ## Production Readiness Update — 2026-08-03
 - Optimized dashboard and employee activity reads to fetch only the collection fields needed for calculations and display.
 - The application continues to use the existing MongoDB database without destructive migration or reset steps.
+
+## Bug Fix — 2026-08-03
+- Employee deletion now opens a clear confirmation dialog and surfaces removal errors rather than failing silently.
+- Field Employees now appears directly below Vendor Management in the administrator workspace.
