@@ -10,7 +10,7 @@ from pymongo import ReturnDocument
 from starlette.responses import Response
 
 from auth import hash_password, sanitize_user
-from models import Collection, CollectionCreate, Employee, EmployeeCreate, Expense, ExpenseCreate, QuickVendorCreate, Vendor, VendorCreate
+from models import Collection, CollectionCreate, Employee, EmployeeCreate, QuickVendorCreate, Vendor, VendorCreate
 from storage import download_photo, upload_profile_photo
 
 
@@ -94,7 +94,12 @@ def build_router(db, current_user):
         existing = await db.vendors.find_one({"business_name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}}, {"_id": 0})
         if existing:
             return Vendor(**{**existing, "name": existing.get("name", name), "business_name": existing.get("business_name", name)}).model_dump()
-        vendor = Vendor(name=name, business_name=name, source="quick-add").model_dump()
+        vendor = Vendor(
+            name=name,
+            business_name=name,
+            phone="Pending update",
+            source="quick-add",
+        ).model_dump()
         await db.vendors.insert_one(vendor.copy())
         return vendor
 
@@ -147,6 +152,17 @@ def build_router(db, current_user):
         await db.users.update_one({"id": employee_id}, {"$set": {"name": payload.name, "phone": payload.phone.strip(), "password_hash": hash_password(payload.temporary_password), "must_change_password": True}})
         return result
 
+    @router.delete("/employees/{employee_id}")
+    async def remove_employee(employee_id: str, user: dict = Depends(current_user)):
+        admin_only(user)
+        employee = await db.employees.find_one({"id": employee_id}, {"_id": 0, "photo_file_id": 1})
+        if not employee:
+            raise HTTPException(status_code=404, detail="Employee not found")
+        await db.employees.delete_one({"id": employee_id})
+        await db.users.delete_one({"id": employee_id})
+        await db.files.update_many({"owner_employee_id": employee_id}, {"$set": {"is_deleted": True}})
+        return {"ok": True}
+
     @router.get("/employees/{employee_id}/activity")
     async def employee_activity(employee_id: str, user: dict = Depends(current_user)):
         admin_only(user)
@@ -154,10 +170,9 @@ def build_router(db, current_user):
         if not employee:
             raise HTTPException(status_code=404, detail="Employee not found")
         collections = await records(db.collections, {"employee_id": employee_id}, 500)
-        expenses = await records(db.expenses, {"employee_id": employee_id}, 500)
         today = datetime.now(timezone.utc).date().isoformat()
         today_collections = [item for item in collections if item["created_at"].startswith(today)]
-        return {"employee": employee, "today_total": sum(item["amount"] for item in today_collections), "today_vendors": len(set(item.get("vendor_id") for item in today_collections if item.get("vendor_id"))), "collections": collections, "expenses": expenses}
+        return {"employee": employee, "today_total": sum(item["amount"] for item in today_collections), "today_vendors": len(set(item.get("vendor_id") for item in today_collections if item.get("vendor_id"))), "collections": collections}
 
     @router.get("/collections", response_model=list[Collection])
     async def list_collections(employee_id: str | None = None, payment_mode: str | None = None, search: str = "", user: dict = Depends(current_user)):
@@ -178,38 +193,19 @@ def build_router(db, current_user):
         await db.collections.insert_one(collection.copy())
         return collection
 
-    @router.get("/expenses", response_model=list[Expense])
-    async def list_expenses(employee_id: str | None = None, user: dict = Depends(current_user)):
-        scope_id = employee_scope(user, employee_id)
-        return await records(db.expenses, {"employee_id": scope_id} if scope_id else {})
-
-    @router.post("/expenses", response_model=Expense)
-    async def add_expense(payload: ExpenseCreate, user: dict = Depends(current_user)):
-        if user["role"] != "employee":
-            raise HTTPException(status_code=403, detail="Expenses are recorded by field employees")
-        now = datetime.now(timezone.utc)
-        data = payload.model_dump()
-        data["date"] = data.get("date") or now.date().isoformat()
-        expense = Expense(**data, employee_id=user["employee_id"], employee_name=user["name"], created_at=now.isoformat()).model_dump()
-        await db.expenses.insert_one(expense.copy())
-        return expense
-
     @router.get("/dashboard")
     async def dashboard(employee_id: str | None = Query(default=None), user: dict = Depends(current_user)):
         scope_id = employee_scope(user, employee_id)
         today = datetime.now(timezone.utc).date().isoformat()
         month = today[:7]
         collection_query = {"employee_id": scope_id} if scope_id else {}
-        expense_query = {"employee_id": scope_id} if scope_id else {}
         all_collections = await records(db.collections, collection_query, 1000)
-        all_expenses = await records(db.expenses, expense_query, 1000)
         today_collections = [item for item in all_collections if item["created_at"].startswith(today)]
-        today_expenses = [item for item in all_expenses if item["date"] == today]
         month_collections = [item for item in all_collections if item["created_at"].startswith(month)]
         trend = []
         for offset in range(6, -1, -1):
             date = (datetime.now(timezone.utc).date() - timedelta(days=offset)).isoformat()
             trend.append({"date": date[5:], "amount": sum(item["amount"] for item in all_collections if item["created_at"].startswith(date))})
-        return {"today_collection": sum(item["amount"] for item in today_collections), "monthly_collection": sum(item["amount"] for item in month_collections), "today_expenses": sum(item["amount"] for item in today_expenses), "vendors_visited": len(set(item["vendor_id"] for item in today_collections if item.get("vendor_id"))), "active_vendors": await db.vendors.count_documents({"active": True}), "active_employees": await db.employees.count_documents({"active": True}), "trend": trend}
+        return {"today_collection": sum(item["amount"] for item in today_collections), "monthly_collection": sum(item["amount"] for item in month_collections), "vendors_visited": len(set(item["vendor_id"] for item in today_collections if item.get("vendor_id"))), "active_vendors": await db.vendors.count_documents({"active": True}), "active_employees": await db.employees.count_documents({"active": True}), "trend": trend}
 
     return router

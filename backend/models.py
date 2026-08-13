@@ -61,16 +61,3 @@ class Collection(CollectionCreate):
     receipt_number: str
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
-
-class ExpenseCreate(BaseModel):
-    category: str = Field(min_length=2, max_length=60)
-    amount: float = Field(gt=0)
-    remarks: str = Field(default="", max_length=240)
-    date: Optional[str] = None
-
-
-class Expense(ExpenseCreate):
-    id: str = Field(default_factory=lambda: str(uuid4()))
-    employee_id: str
-    employee_name: str
-    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())

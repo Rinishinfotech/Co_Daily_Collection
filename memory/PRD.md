@@ -65,3 +65,7 @@ Build a production-ready money collection management app for field agents and ad
 ## Bug Fix — 2026-08-03
 - Production deployment startup now preserves Kubernetes-provided database settings instead of overriding them with local values.
 - Cross-origin access is configured for production-facing app domains.
+
+## Feature Update — 2026-08-03
+- Removed the daily expense workflow, expense dashboards, audit table, and API actions from the product.
+- Added administrator-only employee account deletion with secure cleanup of linked sign-in access and profile photos.

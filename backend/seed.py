@@ -31,18 +31,11 @@ def sample_collections():
     return [{"id": f"col-{index + 1}", "vendor_id": vendor_id, "vendor_name": vendor_name, "employee_id": employee_id, "employee_name": employee_name, "amount": amount, "payment_mode": mode, "remarks": remarks, "receipt_number": f"LFC-{now.strftime('%y%m')}-{1001 + index}", "created_at": (now - timedelta(hours=hours)).isoformat()} for index, (vendor_id, vendor_name, employee_id, employee_name, amount, mode, remarks, hours) in enumerate(values)]
 
 
-def sample_expenses():
-    now = datetime.now(timezone.utc)
-    values = [("Fuel", 950, "emp-raj", "Raj Mehta", "Route travel", 2), ("Meals", 280, "emp-ananya", "Ananya Shah", "Field lunch", 4), ("Parking", 160, "emp-vikram", "Vikram Rao", "Industrial estate", 26)]
-    return [{"id": f"exp-{index + 1}", "category": category, "amount": amount, "employee_id": employee_id, "employee_name": employee_name, "remarks": remarks, "date": (now - timedelta(hours=hours)).date().isoformat(), "created_at": (now - timedelta(hours=hours)).isoformat()} for index, (category, amount, employee_id, employee_name, remarks, hours) in enumerate(values)]
-
-
 async def seed_database(db):
     if await db.vendors.count_documents({}) == 0:
         await db.vendors.insert_many(VENDORS)
         await db.employees.insert_many(EMPLOYEES)
         await db.collections.insert_many(sample_collections())
-        await db.expenses.insert_many(sample_expenses())
     admin = await db.users.find_one({"phone": "9999999999"})
     if not admin:
         await db.users.insert_one({"id": "admin-root", "name": "Co. Daily Collection Admin", "phone": "9999999999", "role": "admin", "active": True, "must_change_password": False, "password_hash": hash_password("Admin@123"), "created_at": datetime.now(timezone.utc).isoformat()})

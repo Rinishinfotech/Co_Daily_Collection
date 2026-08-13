@@ -151,9 +151,11 @@ class TestRoleIsolation:
                                   json={"vendor_name": "TT", "amount": 10, "payment_mode": "Cash"})
         assert r.status_code == 403
 
-    def test_admin_cannot_post_expense(self, admin):
-        r = admin["session"].post(f"{API}/expenses",
-                                  json={"category": "Fuel", "amount": 5})
+    def test_employee_blocked_from_delete_employee(self, employee, admin):
+        # Employee must not be able to delete any employee (self or other)
+        emps = admin["session"].get(f"{API}/employees").json()
+        target_id = emps[0]["id"]
+        r = employee["session"].delete(f"{API}/employees/{target_id}")
         assert r.status_code == 403
 
 
@@ -176,15 +178,20 @@ class TestAdminFlows:
         r = admin["session"].get(f"{API}/employees/emp-raj/activity")
         assert r.status_code == 200
         d = r.json()
-        for key in ("employee", "today_total", "today_vendors", "collections", "expenses"):
+        for key in ("employee", "today_total", "today_vendors", "collections"):
             assert key in d
         assert d["employee"]["id"] == "emp-raj"
+        # Expenses removed feature: activity payload should not include expenses
+        assert "expenses" not in d
 
     def test_admin_dashboard(self, admin):
         r = admin["session"].get(f"{API}/dashboard")
         assert r.status_code == 200
+        body = r.json()
         for k in ("today_collection", "monthly_collection", "trend", "active_vendors", "active_employees"):
-            assert k in r.json()
+            assert k in body
+        # Expenses removed: dashboard should not include today_expenses
+        assert "today_expenses" not in body
 
     def test_duplicate_phone_rejected(self, admin, new_employee):
         r = admin["session"].post(
@@ -251,14 +258,13 @@ class TestEmployeeFlows:
         assert body["employee_name"] == employee["user"]["name"]
         assert body["receipt_number"].startswith("LFC-")
 
-    def test_expense_uses_signed_identity(self, employee):
-        r = employee["session"].post(
-            f"{API}/expenses",
-            json={"category": "Fuel", "amount": 100, "remarks": "TEST",
-                  "employee_id": "emp-raj", "employee_name": "Spoof"},
-        )
-        assert r.status_code == 200, r.text
-        assert r.json()["employee_id"] == employee["user"]["employee_id"]
+    def test_expense_endpoints_removed(self, employee, admin):
+        """Expenses feature is fully removed; all expense routes must be 404."""
+        for sess in (employee["session"], admin["session"]):
+            assert sess.get(f"{API}/expenses").status_code == 404
+            assert sess.post(f"{API}/expenses",
+                             json={"category": "Fuel", "amount": 5}).status_code == 404
+            assert sess.delete(f"{API}/expenses/anything").status_code == 404
 
     def test_employee_dashboard_scoped(self, employee):
         r = employee["session"].get(f"{API}/dashboard")
@@ -283,11 +289,55 @@ def test_health():
 
 
 def test_no_mongo_id_leak(admin):
-    for ep in ["/vendors", "/employees", "/collections", "/expenses"]:
+    for ep in ["/vendors", "/employees", "/collections"]:
         r = admin["session"].get(f"{API}{ep}")
         assert r.status_code == 200
         for item in r.json():
             assert "_id" not in item
+
+
+# -- admin delete employee ------------------------------------------------
+class TestAdminDeleteEmployee:
+    """Admin-only employee deletion; cascades user+files, blocks employee role."""
+
+    def test_admin_can_delete_created_employee_and_cascade(self, admin):
+        phone = f"+91 9{uuid.uuid4().int % 1000000000:09d}"
+        temp = "TempPass@123"
+        r = admin["session"].post(
+            f"{API}/employees",
+            json={"name": "TEST_DeleteMe", "phone": phone,
+                  "territory": "TEST_DelZone", "temporary_password": temp},
+        )
+        assert r.status_code == 200, r.text
+        emp = r.json()
+        emp_id = emp["id"]
+
+        # Login as that employee once to confirm the user record exists
+        r_login = requests.post(f"{API}/auth/login",
+                                json={"phone": phone, "password": temp})
+        assert r_login.status_code == 200
+
+        # Delete via admin
+        r_del = admin["session"].delete(f"{API}/employees/{emp_id}")
+        assert r_del.status_code == 200, r_del.text
+        assert r_del.json().get("ok") is True
+
+        # Employee no longer in admin listing
+        listing = admin["session"].get(f"{API}/employees").json()
+        assert not any(e["id"] == emp_id for e in listing)
+
+        # Login should now fail (user cascade)
+        r_relogin = requests.post(f"{API}/auth/login",
+                                  json={"phone": phone, "password": temp})
+        assert r_relogin.status_code == 401
+
+    def test_admin_delete_missing_employee_404(self, admin):
+        r = admin["session"].delete(f"{API}/employees/does-not-exist-xyz")
+        assert r.status_code == 404
+
+    def test_delete_employee_requires_auth(self):
+        r = requests.delete(f"{API}/employees/emp-raj")
+        assert r.status_code == 401
 
 
 
