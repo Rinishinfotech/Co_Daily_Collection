@@ -173,8 +173,11 @@ def build_router(db, current_user):
     @router.delete("/employees/{employee_id}")
     async def remove_employee(employee_id: str, user: dict = Depends(current_user)):
         admin_only(user)
-        employee = await db.employees.find_one({"id": employee_id}, {"_id": 0, "photo_file_id": 1})
-        if not employee:
+        employee = await db.employees.find_one(
+            {"id": employee_id},
+            {"_id": 0, "id": 1, "photo_file_id": 1},
+        )
+        if employee is None:
             raise HTTPException(status_code=404, detail="Employee not found")
         await db.employees.delete_one({"id": employee_id})
         await db.users.delete_one({"id": employee_id})

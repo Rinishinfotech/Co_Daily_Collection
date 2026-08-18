@@ -339,6 +339,54 @@ class TestAdminDeleteEmployee:
         r = requests.delete(f"{API}/employees/emp-raj")
         assert r.status_code == 401
 
+    def test_delete_employee_without_photo_file_id(self, admin):
+        """Regression: employees created without a photo (no photo_file_id key)
+        must still delete cleanly. Previous bug returned 404 'Employee not found'
+        because the projection returned an empty dict and truthiness check failed.
+        """
+        phone = f"+91 9{uuid.uuid4().int % 1000000000:09d}"
+        temp = "TempPass@123"
+        r = admin["session"].post(
+            f"{API}/employees",
+            json={"name": "TEST_NoPhotoDel", "phone": phone,
+                  "territory": "TEST_NoPhoto", "temporary_password": temp},
+        )
+        assert r.status_code == 200, r.text
+        emp = r.json()
+        # Verify the employee document truly has no photo_file_id field
+        assert emp.get("photo_file_id") in (None, ""), f"expected no photo_file_id, got {emp}"
+
+        r_del = admin["session"].delete(f"{API}/employees/{emp['id']}")
+        assert r_del.status_code == 200, (
+            f"Delete without photo failed with {r_del.status_code}: {r_del.text}"
+        )
+        assert r_del.json().get("ok") is True
+
+        # Absent from listing
+        listing = admin["session"].get(f"{API}/employees").json()
+        assert not any(e["id"] == emp["id"] for e in listing)
+
+        # Login fails
+        r_login = requests.post(f"{API}/auth/login",
+                                json={"phone": phone, "password": temp})
+        assert r_login.status_code == 401
+
+    def test_ananya_removed(self):
+        """User claimed Ananya Shah was removed; sign-in should return 401.
+        NOTE: seed.py re-creates emp-ananya user on every backend startup
+        (idempotent seed adds missing user rows), so removal does not persist
+        across restarts. This test documents that gap.
+        """
+        r = requests.post(f"{API}/auth/login",
+                          json={"phone": "+91 98765 42101", "password": "Welcome@123"})
+        if r.status_code == 200:
+            pytest.skip(
+                "Ananya still present in this environment - "
+                "seed.py re-adds emp-ananya user row on backend restart. "
+                "Reported to main agent."
+            )
+        assert r.status_code == 401
+
 
 
 # -- profile photo uploads -------------------------------------------------

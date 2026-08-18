@@ -77,3 +77,4 @@ Build a production-ready money collection management app for field agents and ad
 ## Bug Fix — 2026-08-03
 - Employee deletion now opens a clear confirmation dialog and surfaces removal errors rather than failing silently.
 - Field Employees now appears directly below Vendor Management in the administrator workspace.
+- Fixed employee removal for accounts without profile photos by checking the account record correctly.
