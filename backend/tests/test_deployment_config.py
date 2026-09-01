@@ -74,7 +74,7 @@ def test_admin_login():
 def test_employee_login():
     r = requests.post(
         f"{BASE_URL}/api/auth/login",
-        json={"phone": "+91 98765 42100", "password": "RajSecure@2026"},
+        json={"phone": "+91 98765 42100", "password": "Welcome@123"},
         timeout=15,
     )
     assert r.status_code == 200, f"{r.status_code}: {r.text[:300]}"

@@ -1,0 +1,54 @@
+{
+  "summary": "Address-visibility scope tested end-to-end (backend + frontend) as requested. Backend: added TestAddressPersistence (6 tests) to /app/backend/tests/backend_test.py; full suite now 62 passed, 1 skipped, 0 failed. Verified vendor create/list persists address, vendor address min_length=4 validation (422), employee address optional, employee create/update persists address and is returned by GET /api/employees and /api/employees/{id}/activity, and no _id leakage. Frontend (preview URL, admin 9999999999/Admin@123): (1) Vendor Management renders 5 vendor-address-{id} elements, all visible with text; (2) Employee directory renders 0 employee-address-* elements and no seeded address strings (14 Lotus Apartments / 6 Riverwalk Lane / 22 Factory Road) leak into the employee section text; (3) Add Employee form still exposes employee-address-input (placeholder 'Home address'); created TEST_AddrUI_243682 with address '88 TEST Home Road 243682' -> card shows only name/territory/phone (no address), activity-employee-address shows exactly the entered address; temp employee deleted afterwards (cleanup verified count=0); (4) After full page reload vendor address count stays 5 and employee-address count stays 0; (5) Desktop 1920 and mobile 390 checked - no document-level overflow, but directory cards overflow the mobile viewport (see design_issues).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/employees/{id}/activity", "issue": "Returns employee.address as null for seeded employees (emp-raj/ananya/vikram) because those stored docs have no address key, and the activity response is not validated through the Employee model (GET /api/employees returns \"\" for the same employees). Inconsistent typing (null vs \"\") and the UI then renders an empty <p data-testid=activity-employee-address> with height 0 (no 'Address not added' fallback like vendors have)."},
+      {"endpoint": "seed.py / db.collections", "issue": "Sample collections were inserted twice: db.collections contains duplicate documents with ids col-1..col-6 (n=2 each). seed_database only guards on db.vendors being empty, so once the seeded vendors were deleted a restart re-inserted vendors+employees+collections with the same hardcoded ids. This is the direct cause of the React duplicate-key console error flood (see frontend ui_bugs). Seed should upsert by id (or skip existing ids) instead of blind insert_many."},
+      {"endpoint": "POST /api/employees (seed data)", "issue": "Seeded employee docs in DB lack the address field entirely (address seeded in seed.py EMPLOYEES is never applied to already-existing docs). Employee address feature therefore has no real data for seeded staff; only newly created employees carry an address."},
+      {"endpoint": "POST /api/employees/{id}/reset-password", "issue": "router.py L165 `employee[\"address\"] = employee.get(\"address\") or \"Address not added\"` is dead code - the projection only selects {id, name} and the value is never returned. Remove it."},
+      {"endpoint": "GET /api/vendors (data hygiene)", "issue": "All original seeded vendors (Urban Grocers, Sunrise Pharma, Corner & Co., Harvest Foods, Apex Works) are gone; the directory now shows leftover TEST_* quick-add vendors (TEST_QuickVendor_0f3ab451, TEST_Idem_ac4af3, test_case_267c3a, TEST_CollectVendor_af2347) whose address is 'Pending update'. Leftover TEST_AuthEmp/TEST_OtherEmp employees also linger from earlier test runs. Not caused by this change, but the vendor-address UI now mostly displays 'Pending update' placeholders."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AdminPortal (collections feed / activity history)", "issue": "Console flooded with React 'Encountered two children with the same key' errors for keys col-1..col-6 on every render, caused by duplicate seeded collection documents (see backend_issues). Duplicate rows are visible in the collections feed and in the activity history (e.g. 'Nikhil Arora' repeated). Fix the duplicate data in seed and/or key on a guaranteed-unique value.", "selector": "[data-testid^=\"admin-collection-\"]", "priority": "MEDIUM"},
+      {"component": "AdminPortal activity drawer", "issue": "activity-employee-address renders as an empty element (height 0) for employees stored without an address; no fallback text, leaving a blank gap under the phone/territory line. Vendor cards use 'Address not added' - add the same fallback here for parity.", "selector": "[data-testid=\"activity-employee-address\"]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "AdminPortal management grid @390px (mobile)", "issues": ["Directory cards overflow the viewport: vendor card measures x=26 width=383 so its right edge is 409px vs 390px viewport; the row-level remove-vendor / reset / delete icon buttons are visually clipped at the right edge (visible in mobile screenshots). Document scrollWidth stays 390 (overflow hidden/clipped) so the buttons are only partially reachable. Applies to both vendor and employee directory rows.", "Employee row name and meta text render with no separating space/margin ('Raj MehtaCentral Market · +91 98765 42100') because the <span> is inline immediately after <strong> with gap=-78px on wrap; add a block/margin to .person-cell span."]},
+      {"screen": "AdminPortal vendor directory", "issues": ["Vendor address uses 12px #64748b on white (contrast ~4.7:1, acceptable) but is visually indistinguishable from the contact/phone line; consider a label or icon so the address reads as an address."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/iter11.xml"
+  ],
+  "action_items": [
+    "De-duplicate db.collections (col-1..col-6 exist twice) and make seed_database idempotent per-document (upsert by id) so a restart after vendor deletion cannot duplicate collections -> removes the React duplicate-key console error flood.",
+    "Add an 'Address not added' fallback for activity-employee-address, and return address consistently (\"\" not null) from GET /api/employees/{id}/activity by validating through the Employee model.",
+    "Fix mobile (<=390px) directory card overflow: cards extend ~19px past the viewport and clip the row action buttons.",
+    "Add spacing between employee name and the territory/phone meta line in .person-cell.",
+    "Remove dead line router.py L165 (employee['address'] assignment inside reset_employee_password).",
+    "Optional data hygiene: prune leftover TEST_* vendors/employees and restore/upsert seeded vendor+employee rows (including address) so the address UI shows realistic data."
+  ],
+  "critical_code_review_comments": [
+    "AdminPortal.jsx vendor card correctly renders data-testid=vendor-address-{id} with an 'Address not added' fallback; employee card intentionally renders only name/territory/phone - implementation matches the requested behaviour exactly and survives a reload.",
+    "Employee address remains captured (employee-address-input, required) and is persisted via POST/PUT /api/employees and surfaced only in the activity drawer - correct 'store but hide from list' design.",
+    "AdminPortal.jsx is written as extremely long single-line JSX (lines 45-47 are >4k chars each). Even at 47 lines this file is unmaintainable and diff-hostile; split vendor directory, employee directory and activity drawer into components.",
+    "Activity endpoint returns a raw Mongo document (minus _id) rather than a Pydantic-validated Employee, so missing fields surface as null to the UI - validate the response model.",
+    "seed_database gating on `db.vendors.count_documents({}) == 0` is a fragile idempotency guard; deleting vendors re-triggers a full re-seed of employees and collections with hardcoded ids."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (added TestAddressPersistence: vendor address create/list/validation, employee address persistence via list + activity, optional address, address update)"
+  ],
+  "success_rate": {"backend": "100% (62 passed, 1 skipped, 0 failed)", "frontend": "100% of the 5 requested address scenarios passed; 2 unrelated UI/console issues + mobile overflow found"},
+  "seed_data_creation": "Created and deleted one temporary employee TEST_AddrUI_243682 via the admin UI (removed, verified gone). Backend tests create and delete their own TEST_ vendors/employees within each test.",
+  "test_credentials": "Admin 9999999999 / Admin@123 (from /app/memory/test_credentials.md)",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Address scope is fully verified: vendor-address-{id} rendered (5 elements, persists across reload), employee directory has 0 employee-address-* elements and no leaked address text, employee-address-input still present in Add Employee form, and activity-employee-address shows the stored address for newly created employees. Remaining known issues are outside the address scope: duplicate seeded collection ids col-1..col-6 (React duplicate key errors), seeded employees stored without an address field (activity address renders blank, API returns null), mobile 390px directory card overflow clipping row action buttons, and missing space between employee name and meta. New regression tests live in TestAddressPersistence in /app/backend/tests/backend_test.py.",
+  "rca_of_the_issue": "React duplicate-key flood RCA: seed_database() only skips seeding when db.vendors is non-empty. A previous run deleted all seeded vendors, so on the next backend start the whole seed block ran again and insert_many re-inserted sample_collections() with the same hardcoded ids col-1..col-6, producing two documents per id (verified via aggregation: each of col-1..col-6 has n=2). GET /api/collections therefore returns duplicate ids and AdminPortal maps them with key={item.id}, triggering the warning and rendering duplicate feed/activity rows. Blank activity address RCA: seeded employee documents in Mongo have no 'address' key (they predate the field and seed never updates existing docs), and the activity endpoint returns the raw document, so the frontend renders an empty <p> with no fallback."
+}

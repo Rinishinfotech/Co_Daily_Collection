@@ -141,7 +141,7 @@ def build_router(db, current_user):
         admin_only(user)
         if await db.users.find_one({"phone": payload.phone.strip()}):
             raise HTTPException(status_code=400, detail="This phone number already has an account")
-        employee = Employee(name=payload.name, phone=payload.phone.strip(), territory=payload.territory).model_dump()
+        employee = Employee(name=payload.name, phone=payload.phone.strip(), territory=payload.territory, address=payload.address.strip()).model_dump()
         account = {"id": employee["id"], "name": employee["name"], "phone": employee["phone"], "role": "employee", "employee_id": employee["id"], "active": True, "must_change_password": True, "password_hash": hash_password(payload.temporary_password), "created_at": datetime.now(timezone.utc).isoformat()}
         await db.employees.insert_one(employee.copy())
         await db.users.insert_one(account)
@@ -150,7 +150,7 @@ def build_router(db, current_user):
     @router.put("/employees/{employee_id}", response_model=Employee)
     async def update_employee(employee_id: str, payload: EmployeeCreate, user: dict = Depends(current_user)):
         admin_only(user)
-        result = await db.employees.find_one_and_update({"id": employee_id}, {"$set": {"name": payload.name, "phone": payload.phone.strip(), "territory": payload.territory}}, return_document=ReturnDocument.AFTER, projection={"_id": 0})
+        result = await db.employees.find_one_and_update({"id": employee_id}, {"$set": {"name": payload.name, "phone": payload.phone.strip(), "territory": payload.territory, "address": payload.address.strip()}}, return_document=ReturnDocument.AFTER, projection={"_id": 0})
         if not result:
             raise HTTPException(status_code=404, detail="Employee not found")
         await db.users.update_one({"id": employee_id}, {"$set": {"name": payload.name, "phone": payload.phone.strip(), "password_hash": hash_password(payload.temporary_password), "must_change_password": True}})
@@ -190,6 +190,7 @@ def build_router(db, current_user):
         employee = await db.employees.find_one({"id": employee_id}, {"_id": 0})
         if not employee:
             raise HTTPException(status_code=404, detail="Employee not found")
+        employee["address"] = employee.get("address") or "Address not added"
         collections = await records(
             db.collections,
             {"employee_id": employee_id},

@@ -33,6 +33,7 @@ class EmployeeCreate(BaseModel):
     name: str = Field(min_length=2, max_length=80)
     phone: str = Field(min_length=8, max_length=20)
     territory: str = Field(min_length=2, max_length=80)
+    address: str = Field(default="", max_length=180)
     temporary_password: str = Field(min_length=8, max_length=100)
 
 
@@ -45,6 +46,7 @@ class Employee(BaseModel):
     name: str
     phone: str
     territory: str
+    address: str = ""
     active: bool = True
     avatar: Optional[str] = None
     photo_file_id: Optional[str] = None

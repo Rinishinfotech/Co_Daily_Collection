@@ -78,3 +78,20 @@ Build a production-ready money collection management app for field agents and ad
 - Employee deletion now opens a clear confirmation dialog and surfaces removal errors rather than failing silently.
 - Field Employees now appears directly below Vendor Management in the administrator workspace.
 - Fixed employee removal for accounts without profile photos by checking the account record correctly.
+
+## Feature Update — 2026-08-03
+- Employee address is now captured during account creation and displayed in the administrator directory and activity profile.
+- Vendor addresses are now visible in the administrator vendor directory.
+- Employee addresses remain stored but are hidden from the employee directory view.
+
+## Reliability Update — 2026-08-03
+- Seed setup now runs only for an entirely new database, preserves intentional record removals, and cleans exact duplicate sample collection ids once.
+- Administrator directory cards now keep names, metadata, addresses, and action controls readable on narrow screens.
+
+## Bug Fix — 2026-08-03
+- Receipt PDFs now use printer-width pages with measured content height, high-visibility amount/details, safe `Rs.` currency text, and reliable print fallback behavior.
+
+## Feature Update — 2026-08-03
+- Receipt sharing, downloading, and printing now use a receipt-only JPEG image instead of PDF output.
+- Receipt amounts are displayed as plain formatted numbers without a rupee symbol prefix.
+- JPEG exports include protected side and bottom padding so no receipt text is clipped in the generated image.

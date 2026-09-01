@@ -4,9 +4,9 @@ from auth import hash_password
 
 
 EMPLOYEES = [
-    {"id": "emp-raj", "name": "Raj Mehta", "phone": "+91 98765 42100", "territory": "Central Market", "active": True, "avatar": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=160&q=80"},
-    {"id": "emp-ananya", "name": "Ananya Shah", "phone": "+91 98765 42101", "territory": "Riverside", "active": True, "avatar": "https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=160&q=80"},
-    {"id": "emp-vikram", "name": "Vikram Rao", "phone": "+91 98765 42102", "territory": "Industrial Zone", "active": True, "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80"},
+    {"id": "emp-raj", "name": "Raj Mehta", "phone": "+91 98765 42100", "territory": "Central Market", "address": "14 Lotus Apartments, Central", "active": True, "avatar": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=160&q=80"},
+    {"id": "emp-ananya", "name": "Ananya Shah", "phone": "+91 98765 42101", "territory": "Riverside", "address": "6 Riverwalk Lane, Riverside", "active": True, "avatar": "https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=160&q=80"},
+    {"id": "emp-vikram", "name": "Vikram Rao", "phone": "+91 98765 42102", "territory": "Industrial Zone", "address": "22 Factory Road, Industrial Zone", "active": True, "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=160&q=80"},
 ]
 
 VENDORS = [
@@ -32,16 +32,38 @@ def sample_collections():
 
 
 async def seed_database(db):
-    if await db.vendors.count_documents({}) == 0:
-        await db.vendors.insert_many(VENDORS)
-        await db.employees.insert_many(EMPLOYEES)
-        await db.collections.insert_many(sample_collections())
+    seed_marker = await db.app_meta.find_one({"id": "initial-seed-v2"})
+    seeded_employee_ids = set()
+    if not seed_marker:
+        is_empty = all([
+            await db.vendors.count_documents({}) == 0,
+            await db.employees.count_documents({}) == 0,
+            await db.collections.count_documents({}) == 0,
+        ])
+        if is_empty:
+            await db.vendors.insert_many(VENDORS)
+            await db.employees.insert_many(EMPLOYEES)
+            await db.collections.insert_many(sample_collections())
+            seeded_employee_ids = {employee["id"] for employee in EMPLOYEES}
+        for collection in sample_collections():
+            duplicates = await db.collections.find({"id": collection["id"]}).sort("created_at", 1).to_list(100)
+            if len(duplicates) > 1:
+                await db.collections.delete_many({"_id": {"$in": [item["_id"] for item in duplicates[1:]]}})
+        await db.app_meta.insert_one({"id": "initial-seed-v2", "created_at": datetime.now(timezone.utc).isoformat()})
+    for employee in EMPLOYEES:
+        await db.employees.update_one(
+            {"id": employee["id"], "address": {"$exists": False}},
+            {"$set": {"address": employee["address"]}},
+        )
     admin = await db.users.find_one({"phone": "9999999999"})
     if not admin:
         await db.users.insert_one({"id": "admin-root", "name": "Co. Daily Collection Admin", "phone": "9999999999", "role": "admin", "active": True, "must_change_password": False, "password_hash": hash_password("Admin@123"), "created_at": datetime.now(timezone.utc).isoformat()})
     else:
         await db.users.update_one({"id": "admin-root"}, {"$set": {"name": "Co. Daily Collection Admin"}})
     for employee in EMPLOYEES:
+        if not await db.employees.find_one({"id": employee["id"]}, {"_id": 1}):
+            await db.users.delete_one({"id": employee["id"], "role": "employee"})
+            continue
         existing = await db.users.find_one({"id": employee["id"]})
-        if not existing:
+        if not existing and employee["id"] in seeded_employee_ids:
             await db.users.insert_one({"id": employee["id"], "name": employee["name"], "phone": employee["phone"], "role": "employee", "employee_id": employee["id"], "active": True, "must_change_password": True, "password_hash": hash_password("Welcome@123"), "created_at": datetime.now(timezone.utc).isoformat()})

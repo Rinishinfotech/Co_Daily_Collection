@@ -601,3 +601,103 @@ class TestQuickVendor:
         body = c.json()
         assert body["vendor_id"] == vendor["id"]
         assert body["amount"] == 12.5
+
+
+# -- address persistence & exposure (vendor + employee) ---------------------
+class TestAddressPersistence:
+    """Vendor address visible in listings; employee address stored + returned via API/activity."""
+
+    def test_vendor_create_persists_address(self, admin):
+        payload = {
+            "name": "TEST_VendorContact",
+            "business_name": f"TEST_VendorBiz_{uuid.uuid4().hex[:6]}",
+            "phone": "+91 90000 00001",
+            "address": "77 TEST Address Lane, Testville",
+        }
+        r = admin["session"].post(f"{API}/vendors", json=payload)
+        assert r.status_code == 200, r.text
+        vendor = r.json()
+        assert vendor["address"] == payload["address"]
+        assert "_id" not in vendor
+        try:
+            listing = admin["session"].get(f"{API}/vendors")
+            assert listing.status_code == 200
+            match = [v for v in listing.json() if v["id"] == vendor["id"]]
+            assert match, "created vendor missing from GET /api/vendors"
+            assert match[0]["address"] == payload["address"]
+            assert match[0]["business_name"] == payload["business_name"]
+            assert match[0]["phone"] == payload["phone"]
+        finally:
+            assert admin["session"].delete(f"{API}/vendors/{vendor['id']}").status_code == 200
+
+    def test_all_seeded_vendors_expose_address_field(self, admin):
+        r = admin["session"].get(f"{API}/vendors")
+        assert r.status_code == 200, r.text
+        vendors = r.json()
+        assert len(vendors) > 0
+        for v in vendors:
+            assert "address" in v, f"vendor {v['id']} missing address key"
+            assert isinstance(v["address"], str)
+
+    def test_vendor_address_too_short_rejected(self, admin):
+        r = admin["session"].post(f"{API}/vendors", json={
+            "name": "TEST_Short", "business_name": "TEST_ShortBiz",
+            "phone": "+91 90000 00002", "address": "ab"})
+        assert r.status_code == 422, r.text
+
+    def test_employee_address_persists_and_appears_in_activity(self, admin):
+        phone = f"+91 9{uuid.uuid4().int % 1000000000:09d}"
+        address = "12 TEST Home Street, Sector 9"
+        r = admin["session"].post(f"{API}/employees", json={
+            "name": "TEST_AddrEmp", "phone": phone, "territory": "TEST_Territory",
+            "address": address, "temporary_password": "TempPass@123"})
+        assert r.status_code == 200, r.text
+        emp = r.json()
+        assert emp["address"] == address
+        assert "_id" not in emp
+        try:
+            listing = admin["session"].get(f"{API}/employees")
+            assert listing.status_code == 200
+            match = [e for e in listing.json() if e["id"] == emp["id"]]
+            assert match, "created employee missing from GET /api/employees"
+            assert match[0]["address"] == address, "employee address not persisted in DB"
+
+            activity = admin["session"].get(f"{API}/employees/{emp['id']}/activity")
+            assert activity.status_code == 200, activity.text
+            body = activity.json()
+            assert body["employee"]["address"] == address
+            assert body["employee"]["name"] == "TEST_AddrEmp"
+        finally:
+            assert admin["session"].delete(f"{API}/employees/{emp['id']}").status_code == 200
+            assert admin["session"].get(f"{API}/employees/{emp['id']}/activity").status_code == 404
+
+    def test_employee_address_optional(self, admin):
+        phone = f"+91 9{uuid.uuid4().int % 1000000000:09d}"
+        r = admin["session"].post(f"{API}/employees", json={
+            "name": "TEST_NoAddrEmp", "phone": phone, "territory": "TEST_Territory",
+            "temporary_password": "TempPass@123"})
+        assert r.status_code == 200, r.text
+        emp = r.json()
+        try:
+            assert emp["address"] == ""
+        finally:
+            assert admin["session"].delete(f"{API}/employees/{emp['id']}").status_code == 200
+
+    def test_employee_address_update_persists(self, admin):
+        phone = f"+91 9{uuid.uuid4().int % 1000000000:09d}"
+        r = admin["session"].post(f"{API}/employees", json={
+            "name": "TEST_UpdAddrEmp", "phone": phone, "territory": "TEST_Territory",
+            "address": "Old TEST address", "temporary_password": "TempPass@123"})
+        assert r.status_code == 200, r.text
+        emp = r.json()
+        try:
+            upd = admin["session"].put(f"{API}/employees/{emp['id']}", json={
+                "name": "TEST_UpdAddrEmp", "phone": phone, "territory": "TEST_Territory",
+                "address": "New TEST address 42", "temporary_password": "TempPass@456"})
+            assert upd.status_code == 200, upd.text
+            assert upd.json()["address"] == "New TEST address 42"
+            activity = admin["session"].get(f"{API}/employees/{emp['id']}/activity")
+            assert activity.status_code == 200
+            assert activity.json()["employee"]["address"] == "New TEST address 42"
+        finally:
+            assert admin["session"].delete(f"{API}/employees/{emp['id']}").status_code == 200
